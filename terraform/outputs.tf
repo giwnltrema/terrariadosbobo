@@ -11,8 +11,12 @@ output "prometheus_url" {
   value = "http://localhost:${var.prometheus_node_port}"
 }
 
+output "terraria_api_hint" {
+  value = "API esperada para gameplay metrics: ${var.terraria_api_url}"
+}
+
 output "grafana_dashboard_hint" {
-  value = "Abra o dashboard 'Terraria K8s Overview' no Grafana"
+  value = "Abra os dashboards 'Terraria K8s Overview' e 'Terraria Gameplay Overview'"
 }
 
 output "world_upload_hint" {

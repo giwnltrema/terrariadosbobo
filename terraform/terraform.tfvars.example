@@ -1,9 +1,13 @@
 # Ajuste os valores antes do terraform apply
-kubeconfig_path        = "~/.kube/config"
-kube_context           = "docker-desktop"
-world_file             = "test.wld"
-terraria_node_port     = 30777
-prometheus_node_port   = 30090
-grafana_node_port      = 30030
-grafana_admin_user     = "admin"
-grafana_admin_password = "troque-essa-senha"
+kubeconfig_path                           = "~/.kube/config"
+kube_context                              = "docker-desktop"
+terraria_image                            = "ghcr.io/beardedio/terraria:tshock-latest"
+world_file                                = "test.wld"
+terraria_api_url                          = "http://terraria-service.terraria.svc.cluster.local:7878"
+terraria_api_token                        = ""
+terraria_exporter_scrape_interval_seconds = 15
+terraria_node_port                        = 30777
+prometheus_node_port                      = 30090
+grafana_node_port                         = 30030
+grafana_admin_user                        = "admin"
+grafana_admin_password                    = "troque-essa-senha"

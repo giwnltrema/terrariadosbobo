@@ -22,10 +22,35 @@ variable "monitoring_namespace" {
   default     = "monitoring"
 }
 
+variable "terraria_image" {
+  description = "Imagem do servidor Terraria"
+  type        = string
+  default     = "ghcr.io/beardedio/terraria:tshock-latest"
+}
+
 variable "world_file" {
   description = "Nome do arquivo .wld que deve existir no volume /config"
   type        = string
   default     = "meu_mapa.wld"
+}
+
+variable "terraria_api_url" {
+  description = "URL da API do Terraria/TShock para o exporter (vazio desativa coleta de gameplay)"
+  type        = string
+  default     = "http://terraria-service.terraria.svc.cluster.local:7878"
+}
+
+variable "terraria_api_token" {
+  description = "Token da API do Terraria/TShock (se configurado no servidor)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "terraria_exporter_scrape_interval_seconds" {
+  description = "Intervalo de coleta do exporter de gameplay"
+  type        = number
+  default     = 15
 }
 
 variable "terraria_node_port" {
