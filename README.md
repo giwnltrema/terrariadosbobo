@@ -1,6 +1,6 @@
 # terrariadosbobo
 
-Infra local para subir um servidor **Terraria** em Kubernetes usando **Terraform**, com um pod de jogo e um pod de monitoramento basico (Prometheus + Grafana).
+Infra local para subir servidor **Terraria** em Kubernetes com **Terraform** e monitoramento com **Prometheus + Grafana** (incluindo `node-exporter`, `kube-state-metrics` e dashboard pronto para o pod do Terraria).
 
 Imagem do servidor: `beardedio/terraria`.
 
@@ -11,8 +11,28 @@ Imagem do servidor: `beardedio/terraria`.
 - PVC `terraria-config` (persistencia de config/mapas)
 - Service `NodePort` para jogadores (padrao `30777`)
 - Namespace `monitoring`
-- Deployment `monitoring-stack` (1 pod com 2 containers: Prometheus e Grafana)
-- Services `NodePort` para UI do Prometheus e Grafana
+- Helm `kube-prometheus-stack` com:
+  - Prometheus Operator
+  - Prometheus
+  - Grafana
+  - `prometheus-node-exporter`
+  - `kube-state-metrics`
+- `blackbox-exporter` adicional para probe TCP do servidor Terraria
+- Dashboard custom `Terraria K8s Overview` provisionado automaticamente no Grafana
+
+## O que voce ganha pronto
+
+- Dashboards padrao do kube-prometheus-stack (cluster, nodes, pods)
+- Dashboard custom do Terraria com:
+  - CPU do pod
+  - Memoria do pod
+  - Restarts
+  - Reachability TCP (`probe_success`) do servidor na porta 7777
+
+## Limite atual de metricas do Terraria
+
+A imagem `beardedio/terraria` nao expoe endpoint Prometheus nativo de jogo (players online, tick, etc.).
+Neste setup, as metricas "especificas" do servidor sao por disponibilidade TCP via blackbox probe.
 
 ## Pre-requisitos
 
@@ -20,11 +40,12 @@ Imagem do servidor: `beardedio/terraria`.
 2. Kubernetes habilitado no Docker Desktop
 3. `kubectl` instalado e apontando para `docker-desktop`
 4. Terraform >= 1.6
-5. PowerShell como Administrador para abrir firewall
+5. Helm instalado (necessario para o provider Helm do Terraform)
+6. PowerShell como Administrador para abrir firewall
 
 ## Estrutura
 
-- `terraform/`: recursos de infra (k8s + services + monitoramento)
+- `terraform/`: recursos de infra (k8s + monitoring)
 - `scripts/deploy.ps1`: init/validate/apply
 - `scripts/upload-world.ps1`: copia mapa para o volume do servidor
 - `scripts/open-firewall.ps1`: libera portas no firewall do Windows
@@ -37,7 +58,7 @@ Imagem do servidor: `beardedio/terraria`.
 Copy-Item terraform/terraform.tfvars.example terraform/terraform.tfvars
 ```
 
-2. Ajuste `terraform/terraform.tfvars` (principalmente senha do Grafana e nome do mundo).
+2. Ajuste `terraform/terraform.tfvars` (senha do Grafana e nome do mundo).
 
 3. Suba a infra:
 
@@ -62,8 +83,6 @@ Copy-Item terraform/terraform.tfvars.example terraform/terraform.tfvars
 
 3. Garanta que o `world_file` no `terraform.tfvars` tenha o mesmo nome do arquivo enviado.
 
-Observacao: se voce tiver arquivo `.twld` associado ao mundo, envie ele tambem com `kubectl cp` para `/config` no mesmo pod.
-
 ## Acesso
 
 - Terraria (amigos): `SEU_IP_LAN:30777` (ou porta definida em `terraria_node_port`)
@@ -76,14 +95,13 @@ Para descobrir seu IP LAN:
 ipconfig
 ```
 
-Use o IPv4 da interface da sua rede local (Wi-Fi/Ethernet).
-
 ## Operacao diaria
 
-Status dos pods:
+Status:
 
 ```powershell
 kubectl get pods -A
+kubectl get svc -A
 ```
 
 Logs do Terraria:
@@ -104,9 +122,8 @@ kubectl rollout restart deployment/terraria-server -n terraria
 terraform -chdir=terraform destroy -auto-approve
 ```
 
-## Notas importantes
+## Notas
 
-- Esse setup e para uso local/self-hosted.
-- Para amigos fora da sua rede local, voce vai precisar encaminhar porta no roteador/NAT e talvez DNS dinamico.
-- O monitoramento aqui e basico: Prometheus e Grafana no mesmo pod para simplificar operacao local.
-- As imagens estao com tag `latest`; se quiser mais previsibilidade, troque para tags fixas em `terraform/main.tf`.
+- Setup focado em ambiente local/self-hosted.
+- Para amigos fora da LAN: port forwarding no roteador.
+- Para metricas de gameplay (players online, boss events etc.), o proximo passo e adicionar um exporter custom ligado ao protocolo/RCON do Terraria.

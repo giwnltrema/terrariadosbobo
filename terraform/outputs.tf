@@ -11,6 +11,10 @@ output "prometheus_url" {
   value = "http://localhost:${var.prometheus_node_port}"
 }
 
+output "grafana_dashboard_hint" {
+  value = "Abra o dashboard 'Terraria K8s Overview' no Grafana"
+}
+
 output "world_upload_hint" {
   value = "Rode scripts/upload-world.ps1 -WorldFile C:/caminho/seu-mapa.wld"
 }
