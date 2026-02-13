@@ -1,129 +1,227 @@
 # terrariadosbobo
 
-Infra local para subir servidor **Terraria** em Kubernetes com **Terraform** e monitoramento com **Prometheus + Grafana** (incluindo `node-exporter`, `kube-state-metrics` e dashboard pronto para o pod do Terraria).
+Servidor local de Terraria em Kubernetes com provisionamento via Terraform e observabilidade pronta com Prometheus + Grafana.
 
-Imagem do servidor: `beardedio/terraria`.
+## Visao Geral
+
+Este repositório sobe, no seu ambiente local (Docker Desktop + Kubernetes):
+
+- servidor Terraria (`beardedio/terraria`)
+- persistencia de mundo/config via PVC
+- monitoramento com `kube-prometheus-stack`
+- `node-exporter` e `kube-state-metrics`
+- `blackbox-exporter` para probe TCP do servidor Terraria
+- dashboard custom `Terraria K8s Overview` no Grafana
 
 ## Arquitetura
 
-- Namespace `terraria`
-- Deployment `terraria-server` (1 pod)
-- PVC `terraria-config` (persistencia de config/mapas)
-- Service `NodePort` para jogadores (padrao `30777`)
-- Namespace `monitoring`
-- Helm `kube-prometheus-stack` com:
-  - Prometheus Operator
-  - Prometheus
-  - Grafana
-  - `prometheus-node-exporter`
-  - `kube-state-metrics`
-- `blackbox-exporter` adicional para probe TCP do servidor Terraria
-- Dashboard custom `Terraria K8s Overview` provisionado automaticamente no Grafana
+### Namespace `terraria`
 
-## O que voce ganha pronto
+- Deployment: `terraria-server` (1 replica)
+- PVC: `terraria-config` (5Gi)
+- Service: `terraria-service` (`NodePort`, padrao `30777`)
 
-- Dashboards padrao do kube-prometheus-stack (cluster, nodes, pods)
-- Dashboard custom do Terraria com:
-  - CPU do pod
-  - Memoria do pod
-  - Restarts
-  - Reachability TCP (`probe_success`) do servidor na porta 7777
+### Namespace `monitoring`
 
-## Limite atual de metricas do Terraria
+- Helm release: `kube-prom-stack` (`kube-prometheus-stack`)
+- Prometheus (`NodePort`, padrao `30090`)
+- Grafana (`NodePort`, padrao `30030`)
+- `prometheus-node-exporter`
+- `kube-state-metrics`
+- `blackbox-exporter` + CRD `Probe` para monitorar TCP `terraria-service:7777`
 
-A imagem `beardedio/terraria` nao expoe endpoint Prometheus nativo de jogo (players online, tick, etc.).
-Neste setup, as metricas "especificas" do servidor sao por disponibilidade TCP via blackbox probe.
+## O que ja vem pronto
+
+- Dashboards padrao do kube-prometheus-stack (cluster/nodes/pods)
+- Dashboard custom `Terraria K8s Overview` com:
+  - CPU do pod do Terraria
+  - memoria do pod do Terraria
+  - reinicios do pod
+  - disponibilidade TCP (`probe_success`) da porta 7777
+
+## Limites de metricas especificas do jogo
+
+A imagem `beardedio/terraria` nao expõe endpoint Prometheus nativo para metricas de gameplay (players online, eventos etc.).
+Neste setup, a parte "especifica" do jogo e disponibilidade TCP e saude operacional do pod.
 
 ## Pre-requisitos
 
 1. Windows com WSL2 e Docker Desktop funcionando
 2. Kubernetes habilitado no Docker Desktop
-3. `kubectl` instalado e apontando para `docker-desktop`
-4. Terraform >= 1.6
-5. Helm instalado (necessario para o provider Helm do Terraform)
-6. PowerShell como Administrador para abrir firewall
+3. `kubectl` instalado e com contexto `docker-desktop`
+4. Terraform >= 1.6 instalado no PATH
+5. PowerShell (rodar como Admin para firewall)
 
-## Estrutura
+## Estrutura do Projeto
 
-- `terraform/`: recursos de infra (k8s + monitoring)
-- `scripts/deploy.ps1`: init/validate/apply
-- `scripts/upload-world.ps1`: copia mapa para o volume do servidor
-- `scripts/open-firewall.ps1`: libera portas no firewall do Windows
+- `terraform/providers.tf`: providers Terraform (`kubernetes`, `helm`)
+- `terraform/variables.tf`: variaveis de ambiente/portas/credenciais
+- `terraform/main.tf`: recursos Kubernetes e Helm
+- `terraform/outputs.tf`: endpoints e dicas de acesso
+- `terraform/terraform.tfvars.example`: template de variaveis
+- `scripts/deploy.ps1`: `init`, `validate`, `apply`
+- `scripts/upload-world.ps1`: upload de mundo `.wld`
+- `scripts/open-firewall.ps1`: regras de entrada no Firewall do Windows
 
-## Deploy rapido
+## Primeira Subida (Do Zero)
 
-1. Copie os vars de exemplo:
+### 1. Preparar variaveis
 
 ```powershell
 Copy-Item terraform/terraform.tfvars.example terraform/terraform.tfvars
+notepad terraform/terraform.tfvars
 ```
 
-2. Ajuste `terraform/terraform.tfvars` (senha do Grafana e nome do mundo).
+Ajuste no minimo:
 
-3. Suba a infra:
+- `world_file` (nome exato do arquivo `.wld`)
+- `grafana_admin_password`
+- portas (se quiser mudar)
+
+### 2. Deploy da stack
 
 ```powershell
 ./scripts/deploy.ps1
 ```
 
-4. Abra portas no firewall:
+### 3. Abrir firewall local (Admin)
 
 ```powershell
 ./scripts/open-firewall.ps1
 ```
 
-## Como colocar seu mapa (.wld)
-
-1. Suba a stack primeiro (`deploy.ps1`).
-2. Rode:
+### 4. Enviar o mundo
 
 ```powershell
 ./scripts/upload-world.ps1 -WorldFile "C:/caminho/do/seu_mapa.wld"
 ```
 
-3. Garanta que o `world_file` no `terraform.tfvars` tenha o mesmo nome do arquivo enviado.
+Importante: o nome do arquivo enviado deve bater com `world_file` no `terraform.tfvars`.
 
-## Acesso
+## Acesso e URLs
 
-- Terraria (amigos): `SEU_IP_LAN:30777` (ou porta definida em `terraria_node_port`)
+- Terraria: `SEU_IP_LAN:30777` (ou porta configurada)
 - Grafana: `http://SEU_IP_LAN:30030`
 - Prometheus: `http://SEU_IP_LAN:30090`
 
-Para descobrir seu IP LAN:
+Para descobrir IP LAN:
 
 ```powershell
 ipconfig
 ```
 
-## Operacao diaria
+Use o IPv4 da interface ativa (Wi-Fi ou Ethernet).
 
-Status:
+## Operacao Diaria
+
+### Verificar saude
 
 ```powershell
 kubectl get pods -A
 kubectl get svc -A
 ```
 
-Logs do Terraria:
+### Logs do servidor
 
 ```powershell
 kubectl logs -n terraria deploy/terraria-server -f
 ```
 
-Restart do servidor:
+### Reiniciar Terraria
 
 ```powershell
 kubectl rollout restart deployment/terraria-server -n terraria
+kubectl rollout status deployment/terraria-server -n terraria
 ```
 
-## Desligar tudo
+### Reaplicar alteracoes Terraform
+
+```powershell
+terraform -chdir=terraform plan
+terraform -chdir=terraform apply
+```
+
+## Dashboards e Queries Uteis
+
+No Grafana, abra:
+
+- `Terraria K8s Overview`
+- dashboards padrao de Kubernetes (CPU/RAM de nodes e pods)
+
+Queries PromQL uteis:
+
+- disponibilidade TCP do server:
+
+```promql
+probe_success{job="terraria-tcp-probe"}
+```
+
+- CPU do pod do Terraria:
+
+```promql
+sum(rate(container_cpu_usage_seconds_total{namespace="terraria",pod=~"terraria-server-.*",container!=""}[5m]))
+```
+
+- memoria do pod do Terraria:
+
+```promql
+sum(container_memory_working_set_bytes{namespace="terraria",pod=~"terraria-server-.*",container!=""})
+```
+
+## Troubleshooting
+
+### `terraform` nao reconhecido
+
+Instale Terraform e abra um novo terminal.
+
+### Pod do Terraria nao sobe
+
+```powershell
+kubectl describe pod -n terraria -l app=terraria-server
+kubectl logs -n terraria deploy/terraria-server
+```
+
+Cheque tambem se o nome de `world_file` existe em `/config`.
+
+### Grafana sem dashboard custom
+
+```powershell
+kubectl get configmap -n monitoring terraria-dashboards -o yaml
+kubectl get pods -n monitoring
+```
+
+Aguarde alguns minutos apos o primeiro deploy para sidecar importar dashboards.
+
+### Amigos nao conseguem conectar
+
+1. Validar `NodePort` no service do Terraria
+2. Validar regra do Firewall (`scripts/open-firewall.ps1`)
+3. Confirmar IP LAN correto
+4. Se for acesso externo (fora da sua rede), configurar port forwarding no roteador
+
+## Atualizar Imagens
+
+As imagens estao em `latest`. Para fixar versoes, altere em `terraform/main.tf`:
+
+- `beardedio/terraria:latest`
+- `prom/blackbox-exporter:v0.25.0`
+- chart `kube-prometheus-stack` (via Helm release)
+
+Depois:
+
+```powershell
+terraform -chdir=terraform apply
+```
+
+## Destroy (Remover Tudo)
 
 ```powershell
 terraform -chdir=terraform destroy -auto-approve
 ```
 
-## Notas
+## Proximos Passos Recomendados
 
-- Setup focado em ambiente local/self-hosted.
-- Para amigos fora da LAN: port forwarding no roteador.
-- Para metricas de gameplay (players online, boss events etc.), o proximo passo e adicionar um exporter custom ligado ao protocolo/RCON do Terraria.
+1. Adicionar exporter custom para metricas de gameplay (players online etc.)
+2. Trocar imagens `latest` por tags fixas
+3. Persistir dados do Prometheus/Grafana com PVC
+4. Configurar backup automatizado do mundo `.wld`
