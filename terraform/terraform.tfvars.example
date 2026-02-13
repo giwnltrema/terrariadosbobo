@@ -1,7 +1,7 @@
 # Ajuste os valores antes do terraform apply
 kubeconfig_path        = "~/.kube/config"
 kube_context           = "docker-desktop"
-world_file             = "meu_mapa.wld"
+world_file             = "test.wld"
 terraria_node_port     = 30777
 prometheus_node_port   = 30090
 grafana_node_port      = 30030

@@ -59,8 +59,8 @@ Neste setup, a parte "especifica" do jogo e disponibilidade TCP e saude operacio
 - `terraform/main.tf`: recursos Kubernetes e Helm
 - `terraform/outputs.tf`: endpoints e dicas de acesso
 - `terraform/terraform.tfvars.example`: template de variaveis
-- `scripts/deploy.ps1`: `init`, `validate`, `apply`
-- `scripts/upload-world.ps1`: upload de mundo `.wld`
+- `scripts/deploy.ps1`: valida cluster, bootstrap de CRDs, apply e garantia de mundo
+- `scripts/upload-world.ps1`: envia `.wld` para o PVC ou cria mundo automaticamente se nao existir
 - `scripts/open-firewall.ps1`: regras de entrada no Firewall do Windows
 
 ## Primeira Subida (Do Zero)
@@ -90,13 +90,7 @@ Ajuste no minimo:
 ./scripts/open-firewall.ps1
 ```
 
-### 4. Enviar o mundo
-
-```powershell
-./scripts/upload-world.ps1 -WorldFile "C:/caminho/do/seu_mapa.wld"
-```
-
-Importante: o nome do arquivo enviado deve bater com `world_file` no `terraform.tfvars`.
+### 4. Mundo (automatico ou arquivo proprio)\n\nSe o mundo configurado em `world_file` nao existir no PVC, o `deploy.ps1` ja cria automaticamente.\n\nSe quiser usar um mapa seu, rode:\n\n```powershell\n./scripts/upload-world.ps1 -WorldFile "C:/caminho/do/seu_mapa.wld"\n```\n\nImportante: o nome do arquivo enviado deve bater com `world_file` no `terraform.tfvars`.\n
 
 ## Acesso e URLs
 
@@ -225,3 +219,4 @@ terraform -chdir=terraform destroy -auto-approve
 2. Trocar imagens `latest` por tags fixas
 3. Persistir dados do Prometheus/Grafana com PVC
 4. Configurar backup automatizado do mundo `.wld`
+
