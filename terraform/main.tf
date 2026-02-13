@@ -158,6 +158,11 @@ resource "helm_release" "kube_prometheus_stack" {
       nodeExporter = {
         enabled = true
       }
+      "prometheus-node-exporter" = {
+        hostRootFsMount = {
+          enabled = false
+        }
+      }
       prometheus = {
         service = {
           type     = "NodePort"
@@ -383,3 +388,4 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
