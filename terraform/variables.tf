@@ -207,3 +207,34 @@ variable "grafana_admin_password" {
   default     = "admin123"
   sensitive   = true
 }
+
+
+variable "argocd_app_enabled" {
+  description = "Habilita criacao de Application bootstrap no Argo CD"
+  type        = bool
+  default     = true
+}
+
+variable "argocd_app_name" {
+  description = "Nome da Application bootstrap no Argo CD"
+  type        = string
+  default     = "terrariadosbobo-bootstrap"
+}
+
+variable "argocd_app_repo_url" {
+  description = "Repositorio Git para Application bootstrap do Argo CD"
+  type        = string
+  default     = "https://github.com/giwnltrema/terrariadosbobo.git"
+}
+
+variable "argocd_app_target_revision" {
+  description = "Branch/tag/commit para Argo CD Application"
+  type        = string
+  default     = "main"
+}
+
+variable "argocd_app_path" {
+  description = "Path do app no repositorio para Argo CD"
+  type        = string
+  default     = "argocd/apps/bootstrap"
+}

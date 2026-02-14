@@ -255,3 +255,41 @@ resource "kubernetes_manifest" "terraria_alert_rules" {
   ]
 }
 
+
+resource "kubernetes_manifest" "argocd_bootstrap_application" {
+  count = var.argocd_enabled && var.argocd_app_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = var.argocd_app_name
+      namespace = var.argocd_namespace
+    }
+    spec = {
+      project = "default"
+      source = {
+        repoURL        = var.argocd_app_repo_url
+        targetRevision = var.argocd_app_target_revision
+        path           = var.argocd_app_path
+      }
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = "terrariadosbobo-gitops"
+      }
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = [
+          "CreateNamespace=true"
+        ]
+      }
+    }
+  }
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}

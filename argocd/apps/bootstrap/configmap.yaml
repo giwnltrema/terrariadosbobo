@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: terrariadosbobo-argo-bootstrap
+  namespace: terrariadosbobo-gitops
+data:
+  status: "managed-by-argocd"
