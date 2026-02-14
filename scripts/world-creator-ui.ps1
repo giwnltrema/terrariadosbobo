@@ -31,5 +31,8 @@ if (-not $NoBrowser) {
   Start-Process "http://$Host`:$Port"
 }
 
-& $pythonExe @pythonPrefix $serverPath --host $Host --port $Port
+Write-Host "[world-ui] Terraria World Creator UI"
+Write-Host "[world-ui] URL: http://$Host`:$Port"
+Write-Host "[world-ui] Press Ctrl+C to stop."
 
+& $pythonExe @pythonPrefix $serverPath --host $Host --port $Port

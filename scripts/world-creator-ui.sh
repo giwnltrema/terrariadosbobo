@@ -55,13 +55,17 @@ fi
 if [[ "$NO_BROWSER" != "1" ]]; then
   URL="http://$HOST:$PORT"
   if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "$URL" >/dev/null 2>&1 || true
+    (xdg-open "$URL" >/dev/null 2>&1 || true) &
   elif command -v open >/dev/null 2>&1; then
-    open "$URL" >/dev/null 2>&1 || true
+    (open "$URL" >/dev/null 2>&1 || true) &
   elif command -v cmd.exe >/dev/null 2>&1; then
-    cmd.exe /c start "$URL" >/dev/null 2>&1 || true
+    # Empty title argument keeps cmd/start from treating URL as window title.
+    (cmd.exe /c start "" "$URL" >/dev/null 2>&1 || true) &
   fi
 fi
 
-exec "$PYTHON_BIN" "$SERVER_PATH" --host "$HOST" --port "$PORT"
+echo "[world-ui] Terraria World Creator UI"
+echo "[world-ui] URL: http://$HOST:$PORT"
+echo "[world-ui] Press Ctrl+C to stop."
 
+exec env PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$SERVER_PATH" --host "$HOST" --port "$PORT"
