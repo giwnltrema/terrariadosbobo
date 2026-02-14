@@ -146,14 +146,17 @@ locals {
 
   grafana_github_auth = merge(
     {
-      enabled       = var.grafana_github_oauth_enabled
-      allow_sign_up = true
-      client_id     = var.grafana_github_client_id
-      client_secret = var.grafana_github_client_secret
-      scopes        = local.grafana_github_oauth_scopes
-      auth_url      = "https://github.com/login/oauth/authorize"
-      token_url     = "https://github.com/login/oauth/access_token"
-      api_url       = "https://api.github.com/user"
+      enabled                    = var.grafana_github_oauth_enabled
+      allow_sign_up              = true
+      allow_assign_grafana_admin = true
+      role_attribute_path        = "'GrafanaAdmin'"
+      role_attribute_strict      = false
+      client_id                  = var.grafana_github_client_id
+      client_secret              = var.grafana_github_client_secret
+      scopes                     = local.grafana_github_oauth_scopes
+      auth_url                   = "https://github.com/login/oauth/authorize"
+      token_url                  = "https://github.com/login/oauth/access_token"
+      api_url                    = "https://api.github.com/user"
     },
     length(local.grafana_github_allowed_orgs_trimmed) > 0 ? {
       allowed_organizations = join(" ", local.grafana_github_allowed_orgs_trimmed)
@@ -254,7 +257,10 @@ resource "helm_release" "kube_prometheus_stack" {
             root_url = "http://localhost:${var.grafana_node_port}"
           }
           auth = {
-            disable_login_form = var.grafana_github_oauth_enabled
+            disable_login_form = false
+          }
+          users = {
+            auto_assign_org_role = "Admin"
           }
           "auth.github" = local.grafana_github_auth
         }
@@ -840,4 +846,6 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
+
 
