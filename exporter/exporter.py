@@ -23,6 +23,8 @@ world_chests = Gauge("terraria_world_chests_total", "Quantidade de baus no mundo
 world_houses = Gauge("terraria_world_houses_total", "Quantidade de casas conhecidas no mundo")
 world_housed_npcs = Gauge("terraria_world_housed_npcs_total", "Quantidade de NPCs com casa")
 world_housed_npc = Gauge("terraria_world_housed_npc", "NPC alojado", ["npc"])
+chest_item_count = Gauge("terraria_chest_item_count", "Quantidade de item por bau", ["chest", "item"])
+chest_item_count_by_item = Gauge("terraria_chest_item_count_by_item", "Quantidade total de item em todos os baus", ["item"])
 player_health = Gauge("terraria_player_health", "Vida do jogador", ["player"])
 player_mana = Gauge("terraria_player_mana", "Mana do jogador", ["player"])
 player_deaths = Gauge("terraria_player_deaths_total", "Mortes do jogador", ["player"])
@@ -91,6 +93,23 @@ def _extract_dict_list(payload: Any, keys: List[str]) -> List[Dict[str, Any]]:
                 return [i for i in value if isinstance(i, dict)]
     return []
 
+def _chest_items(chest: Dict[str, Any]) -> List[Dict[str, Any]]:
+    for key in ["items", "inventory", "contents", "chestItems", "Slots", "slots"]:
+        value = chest.get(key)
+        if isinstance(value, list):
+            return [i for i in value if isinstance(i, dict)]
+    return []
+
+
+def _item_name(item: Dict[str, Any]) -> str:
+    return str(item.get("name") or item.get("itemName") or item.get("type") or "unknown")
+
+
+def _item_amount(item: Dict[str, Any]) -> float:
+    amount = item.get("stack", item.get("amount", item.get("count", item.get("quantity", 0))))
+    if isinstance(amount, (int, float)):
+        return float(amount)
+    return 0.0
 
 def scrape_once() -> None:
     source_up.set(0)
@@ -105,6 +124,8 @@ def scrape_once() -> None:
     world_houses.set(0)
     world_housed_npcs.set(0)
     world_housed_npc.clear()
+    chest_item_count.clear()
+    chest_item_count_by_item.clear()
     player_health.clear()
     player_mana.clear()
     player_deaths.clear()
@@ -197,6 +218,19 @@ def scrape_once() -> None:
     parsed_chests = _extract_dict_list(chests, ["chests", "data", "list"])
     if parsed_chests:
         world_chests.set(float(len(parsed_chests)))
+        item_totals: Dict[str, float] = {}
+        for chest in parsed_chests:
+            chest_id = str(chest.get("id") or chest.get("index") or chest.get("name") or "unknown")
+            for item in _chest_items(chest):
+                item_name = _item_name(item)
+                amount = _item_amount(item)
+                if amount <= 0:
+                    continue
+                chest_item_count.labels(chest=chest_id, item=item_name).set(amount)
+                item_totals[item_name] = item_totals.get(item_name, 0.0) + amount
+
+        for item_name, total in item_totals.items():
+            chest_item_count_by_item.labels(item=item_name).set(total)
     else:
         chests_count = _find_first(chests if chests is not None else {}, ["chestcount", "chests", "count"])
         if isinstance(chests_count, (int, float)):

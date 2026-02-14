@@ -83,22 +83,22 @@ elseif (-not $worldExists -and $AutoCreateIfMissing) {
 WORLD_PATH=\"/config/$WorldName\"
 WORLD_NAME=\"$worldBaseName\"
 
-./TerrariaServer -x64 -autocreate 2 -world \"\$WORLD_PATH\" -worldname \"\$WORLD_NAME\" -difficulty 0 -maxplayers 8 -port 7777 >/tmp/worldgen.log 2>&1 &
-pid=\$!
+./TerrariaServer -x64 -autocreate 2 -world \"`$WORLD_PATH\" -worldname \"`$WORLD_NAME\" -difficulty 0 -maxplayers 8 -port 7777 >/tmp/worldgen.log 2>&1 &
+pid=`$!
 
 i=0
-while [ \$i -lt 90 ]; do
-  if [ -f \"\$WORLD_PATH\" ]; then
+while [ `$i -lt 90 ]; do
+  if [ -f \"`$WORLD_PATH\" ]; then
     break
   fi
-  i=\$((i+1))
+  i=`$((i+1))
   sleep 2
 done
 
-kill \$pid >/dev/null 2>&1 || true
-wait \$pid >/dev/null 2>&1 || true
+kill `$pid >/dev/null 2>&1 || true
+wait `$pid >/dev/null 2>&1 || true
 
-if [ ! -f \"\$WORLD_PATH\" ]; then
+if [ ! -f \"`$WORLD_PATH\" ]; then
   echo \"Falha ao criar mundo automaticamente\" >&2
   cat /tmp/worldgen.log >&2 || true
   exit 1

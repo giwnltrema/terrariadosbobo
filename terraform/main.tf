@@ -598,7 +598,32 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
             "type": "table",
             "title": "Player Items",
             "targets": [{"expr": "topk(100, terraria_player_item_count)"}],
-            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20}
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+          },
+          {
+            "id": 14,
+            "type": "table",
+            "title": "Chest Items (Top 100)",
+            "targets": [{"expr": "topk(100, terraria_chest_item_count)"}],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+          },
+          {
+            "id": 15,
+            "type": "barchart",
+            "title": "Chest Items by Type (Top 20)",
+            "targets": [{"expr": "topk(20, terraria_chest_item_count_by_item)"}],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28}
+          },
+          {
+            "id": 16,
+            "type": "timeseries",
+            "title": "World Structures",
+            "targets": [
+              {"expr": "terraria_world_chests_total", "legendFormat": "Chests"},
+              {"expr": "terraria_world_houses_total", "legendFormat": "Houses"},
+              {"expr": "terraria_world_housed_npcs_total", "legendFormat": "Housed NPCs"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28}
           }
         ],
         "schemaVersion": 39,
