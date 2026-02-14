@@ -41,7 +41,7 @@ Stack local estilo producao para servidor de Terraria com observabilidade, backu
 | Metricas | Stack Prometheus Operator (`kube-prometheus-stack`), `kube-state-metrics`, node exporter |
 | Metricas de gameplay | `terraria-exporter` custom (API + fallback parser de `.wld`) |
 | Disponibilidade | Blackbox exporter + `Probe` TCP do servidor |
-| Dashboards | `Terraria K8s Overview` e `Terraria Gameplay Overview` |
+| Dashboards | `Terraria K8s Overview`, `Terraria Gameplay Overview`, `Terraria Logs Overview` |
 | Logs | Loki + Promtail |
 | GitOps | Argo CD + Application bootstrap opcional |
 | Seguranca de dados | CronJob de backup + PVC de backup |
@@ -197,6 +197,7 @@ Parametros de criacao suportados:
 
 - `Terraria K8s Overview`
 - `Terraria Gameplay Overview`
+- `Terraria Logs Overview`
 
 ### PromQL util para checagem rapida
 
@@ -208,6 +209,17 @@ max(terraria_world_chests_total)
 topk(20, sum by (item) (terraria_chest_item_count_by_item))
 probe_success{job="terraria-tcp-probe"}
 ```
+
+### LogQL util para logs (Loki)
+
+```logql
+{namespace="terraria"}
+{namespace="argocd"}
+{namespace=~"terraria|argocd|monitoring"} |= "error"
+topk(10, sum by (namespace, pod) (count_over_time({namespace=~"terraria|argocd|monitoring"}[5m])))
+```
+
+No Grafana, tambem da para usar o menu `Explore` e selecionar a fonte `Loki`.
 
 ## Argo CD
 
@@ -274,3 +286,4 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
+

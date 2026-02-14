@@ -41,7 +41,7 @@ Production-style local stack for a Terraria server with observability, backups, 
 | Metrics | Prometheus Operator stack (`kube-prometheus-stack`), `kube-state-metrics`, node exporter |
 | Gameplay metrics | Custom `terraria-exporter` (API + `.wld` parser fallback) |
 | Availability checks | Blackbox exporter + Prometheus `Probe` for Terraria TCP |
-| Dashboards | `Terraria K8s Overview` and `Terraria Gameplay Overview` |
+| Dashboards | `Terraria K8s Overview`, `Terraria Gameplay Overview`, `Terraria Logs Overview` |
 | Logs | Loki + Promtail |
 | GitOps | Argo CD + optional auto-bootstrap Application |
 | Data safety | World backup CronJob + backup PVC |
@@ -197,6 +197,7 @@ Supported creation parameters:
 
 - `Terraria K8s Overview`
 - `Terraria Gameplay Overview`
+- `Terraria Logs Overview`
 
 ### Useful PromQL checks
 
@@ -208,6 +209,17 @@ max(terraria_world_chests_total)
 topk(20, sum by (item) (terraria_chest_item_count_by_item))
 probe_success{job="terraria-tcp-probe"}
 ```
+
+### Useful LogQL checks (Loki)
+
+```logql
+{namespace="terraria"}
+{namespace="argocd"}
+{namespace=~"terraria|argocd|monitoring"} |= "error"
+topk(10, sum by (namespace, pod) (count_over_time({namespace=~"terraria|argocd|monitoring"}[5m])))
+```
+
+You can also use `Explore` in Grafana and select data source `Loki`.
 
 ## Argo CD
 
@@ -274,3 +286,4 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
+

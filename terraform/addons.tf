@@ -79,17 +79,199 @@ resource "kubernetes_config_map" "grafana_loki_datasource" {
       apiVersion: 1
       datasources:
         - name: Loki
+          uid: loki
           type: loki
           access: proxy
           url: http://loki-stack.monitoring.svc.cluster.local:3100
           isDefault: false
           editable: true
+          jsonData:
+            maxLines: 2000
     EOT
   }
 
   depends_on = [
     helm_release.kube_prometheus_stack,
     helm_release.loki_stack
+  ]
+}
+resource "kubernetes_config_map" "grafana_logs_dashboards" {
+  count = var.loki_enabled ? 1 : 0
+
+  metadata {
+    name      = "terraria-logs-dashboards"
+    namespace = kubernetes_namespace.monitoring.metadata[0].name
+    labels = {
+      grafana_dashboard = "1"
+    }
+  }
+
+  data = {
+    "terraria-logs-overview.json" = <<-EOT
+      {
+        "title": "Terraria Logs Overview",
+        "schemaVersion": 39,
+        "version": 1,
+        "editable": true,
+        "style": "dark",
+        "tags": ["terraria", "logs", "loki"],
+        "time": {"from": "now-6h", "to": "now"},
+        "annotations": {"list": []},
+        "templating": {
+          "list": [
+            {
+              "name": "namespace",
+              "label": "Namespace",
+              "type": "query",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "query": {"query": "label_values(namespace)", "refId": "LokiNamespaceVar"},
+              "refresh": 1,
+              "includeAll": true,
+              "multi": true,
+              "current": {"selected": true, "text": "All", "value": "$__all"}
+            },
+            {
+              "name": "pod",
+              "label": "Pod",
+              "type": "query",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "query": {"query": "label_values({namespace=~\\"$namespace\\"}, pod)", "refId": "LokiPodVar"},
+              "refresh": 2,
+              "includeAll": true,
+              "multi": true,
+              "current": {"selected": true, "text": "All", "value": "$__all"}
+            },
+            {
+              "name": "container",
+              "label": "Container",
+              "type": "query",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "query": {"query": "label_values({namespace=~\\"$namespace\\", pod=~\\"$pod\\"}, container)", "refId": "LokiContainerVar"},
+              "refresh": 2,
+              "includeAll": true,
+              "multi": true,
+              "current": {"selected": true, "text": "All", "value": "$__all"}
+            },
+            {
+              "name": "search",
+              "label": "Text Filter",
+              "type": "textbox",
+              "query": ""
+            }
+          ]
+        },
+        "panels": [
+          {
+            "id": 1,
+            "type": "logs",
+            "title": "Filtered Logs",
+            "datasource": {"type": "loki", "uid": "loki"},
+            "targets": [
+              {
+                "refId": "A",
+                "expr": "{namespace=~\\"$namespace\\", pod=~\\"$pod\\", container=~\\"$container\\"} |= \\"$search\\"",
+                "queryType": "range"
+              }
+            ],
+            "options": {
+              "dedupStrategy": "none",
+              "enableLogDetails": true,
+              "prettifyLogMessage": false,
+              "showLabels": false,
+              "showTime": true,
+              "sortOrder": "Descending",
+              "wrapLogMessage": true
+            },
+            "gridPos": {"h": 14, "w": 24, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "type": "logs",
+            "title": "Terraria Namespace Logs",
+            "datasource": {"type": "loki", "uid": "loki"},
+            "targets": [
+              {
+                "refId": "A",
+                "expr": "{namespace=\\"terraria\\"}",
+                "queryType": "range"
+              }
+            ],
+            "options": {
+              "dedupStrategy": "none",
+              "enableLogDetails": true,
+              "showLabels": false,
+              "showTime": true,
+              "sortOrder": "Descending",
+              "wrapLogMessage": true
+            },
+            "gridPos": {"h": 10, "w": 8, "x": 0, "y": 14}
+          },
+          {
+            "id": 3,
+            "type": "logs",
+            "title": "Argo CD Namespace Logs",
+            "datasource": {"type": "loki", "uid": "loki"},
+            "targets": [
+              {
+                "refId": "A",
+                "expr": "{namespace=\\"argocd\\"}",
+                "queryType": "range"
+              }
+            ],
+            "options": {
+              "dedupStrategy": "none",
+              "enableLogDetails": true,
+              "showLabels": false,
+              "showTime": true,
+              "sortOrder": "Descending",
+              "wrapLogMessage": true
+            },
+            "gridPos": {"h": 10, "w": 8, "x": 8, "y": 14}
+          },
+          {
+            "id": 4,
+            "type": "logs",
+            "title": "Monitoring Namespace Logs",
+            "datasource": {"type": "loki", "uid": "loki"},
+            "targets": [
+              {
+                "refId": "A",
+                "expr": "{namespace=\\"monitoring\\"}",
+                "queryType": "range"
+              }
+            ],
+            "options": {
+              "dedupStrategy": "none",
+              "enableLogDetails": true,
+              "showLabels": false,
+              "showTime": true,
+              "sortOrder": "Descending",
+              "wrapLogMessage": true
+            },
+            "gridPos": {"h": 10, "w": 8, "x": 16, "y": 14}
+          },
+          {
+            "id": 5,
+            "type": "timeseries",
+            "title": "Top Pods by Log Volume (5m)",
+            "datasource": {"type": "loki", "uid": "loki"},
+            "targets": [
+              {
+                "refId": "A",
+                "expr": "topk(10, sum by (namespace, pod) (count_over_time({namespace=~\\"terraria|argocd|monitoring\\"}[5m])))"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}
+          }
+        ]
+      }
+    EOT
+  }
+
+  depends_on = [
+    helm_release.kube_prometheus_stack,
+    helm_release.loki_stack,
+    kubernetes_config_map.grafana_loki_datasource
   ]
 }
 
@@ -327,3 +509,4 @@ resource "kubernetes_manifest" "argocd_bootstrap_application" {
     kubernetes_secret.argocd_repository
   ]
 }
+
