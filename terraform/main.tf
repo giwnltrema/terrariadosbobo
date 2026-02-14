@@ -142,6 +142,7 @@ resource "helm_release" "kube_prometheus_stack" {
   chart            = "kube-prometheus-stack"
   namespace        = kubernetes_namespace.monitoring.metadata[0].name
   create_namespace = false
+  timeout          = 1200
 
   values = [
     yamlencode({
@@ -975,6 +976,7 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
 
 
 
