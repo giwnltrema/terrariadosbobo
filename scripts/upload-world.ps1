@@ -6,7 +6,17 @@ param(
   [string]$PvcName = "terraria-config",
   [string]$ManagerPodName = "world-manager",
   [string]$ManagerImage = "ghcr.io/beardedio/terraria:tshock-latest",
-  [switch]$AutoCreateIfMissing
+  [switch]$AutoCreateIfMissing,
+  [ValidateSet("small", "medium", "large")]
+  [string]$WorldSize = "medium",
+  [ValidateRange(1, 255)]
+  [int]$MaxPlayers = 8,
+  [ValidateSet("classic", "expert", "master", "journey")]
+  [string]$Difficulty = "classic",
+  [string]$Seed = "",
+  [ValidateRange(1, 65535)]
+  [int]$ServerPort = 7777,
+  [string]$ExtraCreateArgs = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,6 +42,11 @@ if (-not $WorldName) {
 }
 
 $worldBaseName = [System.IO.Path]::GetFileNameWithoutExtension($WorldName)
+$worldSizeNumber = @{ small = 1; medium = 2; large = 3 }[$WorldSize]
+$difficultyNumber = @{ classic = 0; expert = 1; master = 2; journey = 3 }[$Difficulty]
+
+$safeSeed = $Seed.Replace('\', '\\').Replace('"', '\"')
+$safeExtraCreateArgs = $ExtraCreateArgs.Replace('\', '\\').Replace('"', '\"')
 
 Write-Host "Escalando $Deployment para 0 replicas para manipular o volume..."
 kubectl scale deployment/$Deployment -n $Namespace --replicas=0 | Out-Null
@@ -77,17 +92,31 @@ if ($WorldFile) {
   $worldExists = $true
 }
 elseif (-not $worldExists -and $AutoCreateIfMissing) {
-  Write-Host "Mundo '$WorldName' nao existe. Criando automaticamente..."
+  Write-Host "Mundo '$WorldName' nao existe. Criando automaticamente (size=$WorldSize, difficulty=$Difficulty, maxplayers=$MaxPlayers)..."
 
   $createCmd = @"
-WORLD_PATH=\"/config/$WorldName\"
-WORLD_NAME=\"$worldBaseName\"
+WORLD_PATH=\"/config/__WORLD_FILE__\"
+WORLD_NAME=\"__WORLD_BASE__\"
+WORLD_SIZE=\"__WORLD_SIZE__\"
+WORLD_DIFFICULTY=\"__WORLD_DIFFICULTY__\"
+MAX_PLAYERS=\"__MAX_PLAYERS__\"
+SERVER_PORT=\"__SERVER_PORT__\"
+WORLD_SEED=\"__WORLD_SEED__\"
+EXTRA_CREATE_ARGS=\"__EXTRA_CREATE_ARGS__\"
 
-./TerrariaServer -x64 -autocreate 2 -world \"`$WORLD_PATH\" -worldname \"`$WORLD_NAME\" -difficulty 0 -maxplayers 8 -port 7777 >/tmp/worldgen.log 2>&1 &
+CMD=\"./TerrariaServer -x64 -autocreate `$WORLD_SIZE -world \\\"`$WORLD_PATH\\\" -worldname \\\"`$WORLD_NAME\\\" -difficulty `$WORLD_DIFFICULTY -maxplayers `$MAX_PLAYERS -port `$SERVER_PORT\"
+if [ -n \"`$WORLD_SEED\" ]; then
+  CMD=\"`$CMD -seed \\\"`$WORLD_SEED\\\"\"
+fi
+if [ -n \"`$EXTRA_CREATE_ARGS\" ]; then
+  CMD=\"`$CMD `$EXTRA_CREATE_ARGS\"
+fi
+
+eval \"`$CMD >/tmp/worldgen.log 2>&1 &\"
 pid=`$!
 
 i=0
-while [ `$i -lt 90 ]; do
+while [ `$i -lt 120 ]; do
   if [ -f \"`$WORLD_PATH\" ]; then
     break
   fi
@@ -104,6 +133,15 @@ if [ ! -f \"`$WORLD_PATH\" ]; then
   exit 1
 fi
 "@
+
+  $createCmd = $createCmd.Replace("__WORLD_FILE__", $WorldName)
+  $createCmd = $createCmd.Replace("__WORLD_BASE__", $worldBaseName)
+  $createCmd = $createCmd.Replace("__WORLD_SIZE__", [string]$worldSizeNumber)
+  $createCmd = $createCmd.Replace("__WORLD_DIFFICULTY__", [string]$difficultyNumber)
+  $createCmd = $createCmd.Replace("__MAX_PLAYERS__", [string]$MaxPlayers)
+  $createCmd = $createCmd.Replace("__SERVER_PORT__", [string]$ServerPort)
+  $createCmd = $createCmd.Replace("__WORLD_SEED__", $safeSeed)
+  $createCmd = $createCmd.Replace("__EXTRA_CREATE_ARGS__", $safeExtraCreateArgs)
 
   kubectl exec -n $Namespace $ManagerPodName -- sh -lc $createCmd | Out-Null
   $worldExists = $true

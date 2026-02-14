@@ -2,102 +2,164 @@
 
 Stack local de Terraria com Kubernetes + Terraform + observabilidade + GitOps.
 
-## O que foi integrado
+## O que este projeto sobe
 
-- Servidor Terraria em `terraria`
-- PVC de mundo (`terraria-config`)
-- Backup automático do mundo (`CronJob` + PVC `terraria-backups`)
+- Servidor Terraria (`terraria-server`) com PVC de mundo (`terraria-config`)
+- Upload/criacao automatica de mundo
 - Prometheus + Grafana + Alertmanager (`kube-prometheus-stack`)
-- Node exporter / kube-state-metrics
-- Blackbox probe TCP do Terraria
-- Exporter custom de gameplay (players/mundo/monstros/itens)
-- Dashboards Grafana:
+- Node exporter + kube-state-metrics
+- Blackbox probe TCP do servidor
+- Exporter custom de gameplay
+  - Fonte 1: API TShock/REST (quando disponivel)
+  - Fonte 2 (fallback): parser do arquivo `.wld` no PVC
+- Dashboards:
   - `Terraria K8s Overview`
   - `Terraria Gameplay Overview`
-- Loki + Promtail para logs
-- Argo CD (GitOps) via NodePort
-- OAuth GitHub opcional no Grafana
-- Alertas no Discord via Alertmanager (opcional)
+- Loki + Promtail
+- Argo CD
+- Backup de mundo por CronJob
 
 ## URLs locais
 
 - Grafana: `http://localhost:30030`
 - Prometheus: `http://localhost:30090`
 - Argo CD: `http://localhost:30080`
-- Terraria: `SEU_IP_LAN:30777`
+- Terraria (players): `SEU_IP_LAN:30777`
+
+## Compatibilidade de ambiente
+
+O mesmo stack funciona em:
+
+- Windows (PowerShell)
+- Linux/WSL2 (Bash)
+
+Requisito em ambos: cluster Kubernetes local ativo (ex.: Docker Desktop Kubernetes), `terraform` e `kubectl` no `PATH`.
 
 ## Configuracao
 
-1. Copiar vars de exemplo:
+1. Copiar variaveis de exemplo:
 
 ```powershell
 Copy-Item terraform/terraform.tfvars.example terraform/terraform.tfvars
 ```
 
-2. Editar `terraform/terraform.tfvars` e preencher no minimo:
+```bash
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+```
+
+2. Editar `terraform/terraform.tfvars` (minimo recomendado):
 
 - `world_file`
 - `grafana_admin_password`
 
-3. Para features opcionais:
+3. Opcionais importantes:
 
-- Discord alertas: `discord_webhook_url`
-- OAuth GitHub: `grafana_github_oauth_enabled=true` + `grafana_github_client_id` + `grafana_github_client_secret`
-- Gameplay API token (se TShock/API exigir): `terraria_api_token`
+- `terraria_api_url` / `terraria_api_token` (API de gameplay)
+- `discord_webhook_url` (alertas)
+- `grafana_github_oauth_*` (login GitHub no Grafana)
+- `terraria_world_parse_interval_seconds`
+- `terraria_chest_item_series_limit`
 
-## Deploy
+## Deploy (Windows)
 
 ```powershell
 ./scripts/deploy.ps1
 ```
 
-Depois liberar firewall (admin):
+Com parametros de criacao inicial de mundo:
 
 ```powershell
-./scripts/open-firewall.ps1
+./scripts/deploy.ps1 -WorldName "test.wld" -WorldSize large -MaxPlayers 16 -Difficulty expert -Seed "abc123"
 ```
 
-## Mundo
+## Deploy (Linux / WSL2)
 
-Enviar mapa:
+```bash
+bash ./scripts/deploy.sh
+```
+
+Com parametros de criacao inicial de mundo:
+
+```bash
+bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 16 --difficulty expert --seed abc123
+```
+
+## Upload/criacao de mundo
+
+### Windows
 
 ```powershell
-./scripts/upload-world.ps1 -WorldFile "C:/caminho/seu_mapa.wld"
+# Upload de arquivo existente
+./scripts/upload-world.ps1 -WorldFile "C:/caminho/mapa.wld"
+
+# Criacao automatica se nao existir
+./scripts/upload-world.ps1 -WorldName "test.wld" -WorldSize medium -MaxPlayers 8 -Difficulty classic -Seed "meu-seed"
 ```
 
-Ou criar/garantir mundo por nome:
+### Linux / WSL2
 
-```powershell
-./scripts/upload-world.ps1 -WorldName "test.wld"
+```bash
+# Upload de arquivo existente
+bash ./scripts/upload-world.sh --world-file /c/caminho/mapa.wld
+
+# Criacao automatica se nao existir
+bash ./scripts/upload-world.sh --world-name test.wld --world-size medium --max-players 8 --difficulty classic --seed meu-seed
 ```
+
+### Parametros de criacao suportados
+
+- `WorldSize` / `--world-size`: `small|medium|large`
+- `MaxPlayers` / `--max-players`
+- `Difficulty` / `--difficulty`: `classic|expert|master|journey`
+- `Seed` / `--seed`
+- `ServerPort` / `--server-port`
+- `ExtraCreateArgs` / `--extra-create-args` (args extras brutos para o `TerrariaServer`)
 
 ## Validacao rapida
 
-```powershell
-kubectl get pods -A
+```bash
+kubectl get pods -n terraria
+kubectl get pods -n monitoring
 kubectl get svc -n terraria
 kubectl get svc -n monitoring
-kubectl get svc -n argocd
 ```
 
-Prometheus queries uteis:
+Queries uteis no Prometheus:
 
 ```promql
-terraria_exporter_source_up
-terraria_players_online
-terraria_monster_active
+max(terraria_exporter_source_up)
+max(terraria_world_parser_up)
+max(terraria_players_online)
+max(terraria_world_chests_total)
+topk(20, sum by (item) (terraria_chest_item_count_by_item))
 probe_success{job="terraria-tcp-probe"}
 ```
 
-## Observacoes importantes
+## Quando o dashboard estiver vazio
 
-- Tudo esta focado em ambiente local.
-- Se o cluster for recriado no Docker Desktop, reaplique com `terraform apply`.
-- Se `terraria_exporter_source_up=0`, API de gameplay nao respondeu (URL/token/API do servidor).
-- O Argo CD sobe, mas voce ainda precisa cadastrar o repo/app nele para fluxo GitOps completo.
+1. Verifique exporter:
+
+```bash
+kubectl -n terraria get pods -l app=terraria-exporter
+kubectl -n terraria logs deploy/terraria-exporter --tail=120
+```
+
+2. Verifique mundo:
+
+```bash
+kubectl -n terraria logs deploy/terraria-server --tail=120
+```
+
+3. Se `terraria_exporter_source_up = 0`, o dashboard ainda pode preencher metricas de mundo via parser (`terraria_world_parser_up = 1`) desde que o arquivo `.wld` exista em `/config`.
+
+## Argo CD senha inicial
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
+```
 
 ## Destroy
 
-```powershell
+```bash
 terraform -chdir=terraform destroy -auto-approve
 ```

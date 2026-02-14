@@ -3,7 +3,17 @@ param(
   [string]$KubeContext = "docker-desktop",
   [string]$WorldFile,
   [string]$WorldName,
-  [switch]$SkipWorldEnsure
+  [switch]$SkipWorldEnsure,
+  [ValidateSet("small", "medium", "large")]
+  [string]$WorldSize = "medium",
+  [ValidateRange(1, 255)]
+  [int]$MaxPlayers = 8,
+  [ValidateSet("classic", "expert", "master", "journey")]
+  [string]$Difficulty = "classic",
+  [string]$Seed = "",
+  [ValidateRange(1, 65535)]
+  [int]$ServerPort = 7777,
+  [string]$ExtraCreateArgs = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -98,10 +108,10 @@ if (-not $SkipWorldEnsure) {
   $uploadScript = Join-Path $PSScriptRoot "upload-world.ps1"
 
   if ($WorldFile) {
-    & $uploadScript -WorldFile $WorldFile -WorldName $resolvedWorldName
+    & $uploadScript -WorldFile $WorldFile -WorldName $resolvedWorldName -WorldSize $WorldSize -MaxPlayers $MaxPlayers -Difficulty $Difficulty -Seed $Seed -ServerPort $ServerPort -ExtraCreateArgs $ExtraCreateArgs
   }
   else {
-    & $uploadScript -WorldName $resolvedWorldName
+    & $uploadScript -WorldName $resolvedWorldName -WorldSize $WorldSize -MaxPlayers $MaxPlayers -Difficulty $Difficulty -Seed $Seed -ServerPort $ServerPort -ExtraCreateArgs $ExtraCreateArgs
   }
 }
 else {

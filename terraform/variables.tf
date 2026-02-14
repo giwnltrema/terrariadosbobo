@@ -59,6 +59,17 @@ variable "terraria_exporter_scrape_interval_seconds" {
   default     = 15
 }
 
+variable "terraria_world_parse_interval_seconds" {
+  description = "Intervalo de parsing do arquivo .wld no exporter"
+  type        = number
+  default     = 30
+}
+
+variable "terraria_chest_item_series_limit" {
+  description = "Limite de series por chest/item expostas no Prometheus"
+  type        = number
+  default     = 500
+}
 variable "monitoring_storage_class" {
   description = "StorageClass para persistencia local"
   type        = string

@@ -16,7 +16,7 @@ output "argocd_url" {
 }
 
 output "terraria_api_hint" {
-  value = "API esperada para gameplay metrics: ${var.terraria_api_url}"
+  value = "API de gameplay: ${var.terraria_api_url} (fallback parser .wld em /config/${var.world_file})"
 }
 
 output "grafana_dashboard_hint" {
@@ -28,5 +28,5 @@ output "backup_hint" {
 }
 
 output "world_upload_hint" {
-  value = "Rode scripts/upload-world.ps1 -WorldFile C:/caminho/seu-mapa.wld"
+  value = "Rode scripts/upload-world.ps1 (Windows) ou scripts/upload-world.sh (Linux/WSL)"
 }

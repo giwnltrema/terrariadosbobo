@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WORLD_FILE=""
+WORLD_NAME=""
+NAMESPACE="terraria"
+DEPLOYMENT="terraria-server"
+PVC_NAME="terraria-config"
+MANAGER_POD_NAME="world-manager"
+MANAGER_IMAGE="ghcr.io/beardedio/terraria:tshock-latest"
+AUTO_CREATE_IF_MISSING="true"
+WORLD_SIZE="medium"
+MAX_PLAYERS="8"
+DIFFICULTY="classic"
+SEED=""
+SERVER_PORT="7777"
+EXTRA_CREATE_ARGS=""
+
+usage() {
+  cat <<USAGE
+Usage: scripts/upload-world.sh [options]
+
+Options:
+  --world-file PATH
+  --world-name NAME.wld
+  --namespace NAME                (default: terraria)
+  --deployment NAME               (default: terraria-server)
+  --pvc-name NAME                 (default: terraria-config)
+  --manager-pod-name NAME         (default: world-manager)
+  --manager-image IMAGE           (default: ghcr.io/beardedio/terraria:tshock-latest)
+  --no-auto-create                (do not create world if missing)
+  --world-size small|medium|large (default: medium)
+  --max-players N                 (default: 8)
+  --difficulty classic|expert|master|journey (default: classic)
+  --seed VALUE
+  --server-port N                 (default: 7777)
+  --extra-create-args "..."      (raw args appended to TerrariaServer autocreate cmd)
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --world-file)
+      WORLD_FILE="$2"; shift 2 ;;
+    --world-name)
+      WORLD_NAME="$2"; shift 2 ;;
+    --namespace)
+      NAMESPACE="$2"; shift 2 ;;
+    --deployment)
+      DEPLOYMENT="$2"; shift 2 ;;
+    --pvc-name)
+      PVC_NAME="$2"; shift 2 ;;
+    --manager-pod-name)
+      MANAGER_POD_NAME="$2"; shift 2 ;;
+    --manager-image)
+      MANAGER_IMAGE="$2"; shift 2 ;;
+    --no-auto-create)
+      AUTO_CREATE_IF_MISSING="false"; shift ;;
+    --world-size)
+      WORLD_SIZE="$2"; shift 2 ;;
+    --max-players)
+      MAX_PLAYERS="$2"; shift 2 ;;
+    --difficulty)
+      DIFFICULTY="$2"; shift 2 ;;
+    --seed)
+      SEED="$2"; shift 2 ;;
+    --server-port)
+      SERVER_PORT="$2"; shift 2 ;;
+    --extra-create-args)
+      EXTRA_CREATE_ARGS="$2"; shift 2 ;;
+    -h|--help)
+      usage; exit 0 ;;
+    *)
+      echo "Parametro desconhecido: $1" >&2
+      usage
+      exit 1 ;;
+  esac
+done
+
+if [[ -n "$WORLD_FILE" && ! -f "$WORLD_FILE" ]]; then
+  echo "Arquivo nao encontrado: $WORLD_FILE" >&2
+  exit 1
+fi
+
+if [[ -n "$WORLD_FILE" ]]; then
+  file_world_name="$(basename "$WORLD_FILE")"
+  if [[ -n "$WORLD_NAME" && "$WORLD_NAME" != "$file_world_name" ]]; then
+    echo "WorldName ($WORLD_NAME) difere do nome do arquivo enviado ($file_world_name)." >&2
+    exit 1
+  fi
+  WORLD_NAME="$file_world_name"
+fi
+
+if [[ -z "$WORLD_NAME" ]]; then
+  echo "Informe --world-name (ou --world-file)." >&2
+  exit 1
+fi
+
+case "$WORLD_SIZE" in
+  small) WORLD_SIZE_NUMBER=1 ;;
+  medium) WORLD_SIZE_NUMBER=2 ;;
+  large) WORLD_SIZE_NUMBER=3 ;;
+  *) echo "world-size invalido: $WORLD_SIZE" >&2; exit 1 ;;
+esac
+
+case "$DIFFICULTY" in
+  classic) DIFFICULTY_NUMBER=0 ;;
+  expert) DIFFICULTY_NUMBER=1 ;;
+  master) DIFFICULTY_NUMBER=2 ;;
+  journey) DIFFICULTY_NUMBER=3 ;;
+  *) echo "difficulty invalida: $DIFFICULTY" >&2; exit 1 ;;
+esac
+
+WORLD_BASE_NAME="${WORLD_NAME%.wld}"
+
+echo "Escalando $DEPLOYMENT para 0 replicas para manipular o volume..."
+kubectl scale "deployment/$DEPLOYMENT" -n "$NAMESPACE" --replicas=0 >/dev/null
+kubectl rollout status "deployment/$DEPLOYMENT" -n "$NAMESPACE" --timeout=180s >/dev/null
+
+echo "Subindo pod auxiliar '$MANAGER_POD_NAME' montando PVC '$PVC_NAME'..."
+kubectl delete pod "$MANAGER_POD_NAME" -n "$NAMESPACE" --ignore-not-found >/dev/null
+
+cat <<EOF | kubectl apply -f - >/dev/null
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $MANAGER_POD_NAME
+  namespace: $NAMESPACE
+spec:
+  restartPolicy: Never
+  containers:
+    - name: world-manager
+      image: $MANAGER_IMAGE
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: terraria-config
+          mountPath: /config
+  volumes:
+    - name: terraria-config
+      persistentVolumeClaim:
+        claimName: $PVC_NAME
+EOF
+
+kubectl wait --for=condition=Ready "pod/$MANAGER_POD_NAME" -n "$NAMESPACE" --timeout=180s >/dev/null
+
+exists_output="$(kubectl exec -n "$NAMESPACE" "$MANAGER_POD_NAME" -- sh -lc "if [ -f '/config/$WORLD_NAME' ]; then echo exists; else echo missing; fi")"
+world_exists="false"
+if [[ "${exists_output}" == "exists" ]]; then
+  world_exists="true"
+fi
+
+if [[ -n "$WORLD_FILE" ]]; then
+  echo "Copiando arquivo '$WORLD_NAME' para o PVC..."
+  kubectl cp "$WORLD_FILE" "${NAMESPACE}/${MANAGER_POD_NAME}:/config/$WORLD_NAME" >/dev/null
+  world_exists="true"
+elif [[ "$world_exists" != "true" && "$AUTO_CREATE_IF_MISSING" == "true" ]]; then
+  echo "Mundo '$WORLD_NAME' nao existe. Criando automaticamente (size=$WORLD_SIZE, difficulty=$DIFFICULTY, maxplayers=$MAX_PLAYERS)..."
+
+  seed_arg=""
+  if [[ -n "$SEED" ]]; then
+    seed_arg="-seed \"$SEED\""
+  fi
+
+  extra_args=""
+  if [[ -n "$EXTRA_CREATE_ARGS" ]]; then
+    extra_args="$EXTRA_CREATE_ARGS"
+  fi
+
+  create_cmd="WORLD_PATH=\"/config/$WORLD_NAME\"; WORLD_NAME=\"$WORLD_BASE_NAME\"; CMD=\"./TerrariaServer -x64 -autocreate $WORLD_SIZE_NUMBER -world \\\"\\$WORLD_PATH\\\" -worldname \\\"\\$WORLD_NAME\\\" -difficulty $DIFFICULTY_NUMBER -maxplayers $MAX_PLAYERS -port $SERVER_PORT $seed_arg $extra_args\"; eval \"\\$CMD >/tmp/worldgen.log 2>&1 &\"; pid=\\$!; i=0; while [ \\$i -lt 120 ]; do if [ -f \\"\\$WORLD_PATH\\" ]; then break; fi; i=\\$((i+1)); sleep 2; done; kill \\$pid >/dev/null 2>&1 || true; wait \\$pid >/dev/null 2>&1 || true; if [ ! -f \\"\\$WORLD_PATH\\" ]; then echo \"Falha ao criar mundo automaticamente\" >&2; cat /tmp/worldgen.log >&2 || true; exit 1; fi"
+
+  kubectl exec -n "$NAMESPACE" "$MANAGER_POD_NAME" -- sh -lc "$create_cmd" >/dev/null
+  world_exists="true"
+fi
+
+if [[ "$world_exists" != "true" ]]; then
+  echo "Mundo '$WORLD_NAME' nao existe no PVC e auto-create foi desativado." >&2
+  exit 1
+fi
+
+echo "Limpando pod auxiliar..."
+kubectl delete pod "$MANAGER_POD_NAME" -n "$NAMESPACE" --ignore-not-found >/dev/null
+
+echo "Subindo deployment $DEPLOYMENT com mundo '$WORLD_NAME'..."
+kubectl scale "deployment/$DEPLOYMENT" -n "$NAMESPACE" --replicas=1 >/dev/null
+kubectl rollout status "deployment/$DEPLOYMENT" -n "$NAMESPACE" --timeout=300s >/dev/null
+
+echo "Mundo pronto: $WORLD_NAME"

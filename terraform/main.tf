@@ -281,7 +281,7 @@ resource "helm_release" "kube_prometheus_stack" {
 resource "kubernetes_secret" "terraria_api" {
   metadata {
     name      = "terraria-api-credentials"
-    namespace = kubernetes_namespace.monitoring.metadata[0].name
+    namespace = kubernetes_namespace.terraria.metadata[0].name
   }
 
   data = {
@@ -294,7 +294,7 @@ resource "kubernetes_secret" "terraria_api" {
 resource "kubernetes_config_map" "terraria_exporter_code" {
   metadata {
     name      = "terraria-exporter-code"
-    namespace = kubernetes_namespace.monitoring.metadata[0].name
+    namespace = kubernetes_namespace.terraria.metadata[0].name
   }
 
   data = {
@@ -305,7 +305,7 @@ resource "kubernetes_config_map" "terraria_exporter_code" {
 resource "kubernetes_deployment" "terraria_exporter" {
   metadata {
     name      = "terraria-exporter"
-    namespace = kubernetes_namespace.monitoring.metadata[0].name
+    namespace = kubernetes_namespace.terraria.metadata[0].name
     labels = {
       app = "terraria-exporter"
     }
@@ -335,7 +335,7 @@ resource "kubernetes_deployment" "terraria_exporter" {
 
           command = ["sh", "-c"]
           args = [
-            "pip install --no-cache-dir prometheus-client requests >/tmp/pip.log 2>&1 && python /app/exporter.py"
+            "pip install --no-cache-dir prometheus-client requests lihzahrd==3.1.0 >/tmp/pip.log 2>&1 && python /app/exporter.py"
           ]
 
           env {
@@ -351,6 +351,21 @@ resource "kubernetes_deployment" "terraria_exporter" {
                 key  = "api-token"
               }
             }
+          }
+
+          env {
+            name  = "WORLD_FILE_PATH"
+            value = "/config/${var.world_file}"
+          }
+
+          env {
+            name  = "WORLD_PARSE_INTERVAL"
+            value = tostring(var.terraria_world_parse_interval_seconds)
+          }
+
+          env {
+            name  = "CHEST_ITEM_SERIES_LIMIT"
+            value = tostring(var.terraria_chest_item_series_limit)
           }
 
           env {
@@ -374,12 +389,27 @@ resource "kubernetes_deployment" "terraria_exporter" {
             mount_path = "/app/exporter.py"
             sub_path   = "exporter.py"
           }
+
+          volume_mount {
+            name       = "terraria-config"
+            mount_path = "/config"
+            read_only  = true
+          }
         }
 
         volume {
           name = "exporter-code"
           config_map {
             name = kubernetes_config_map.terraria_exporter_code.metadata[0].name
+          }
+        }
+
+        volume {
+          name = "terraria-config"
+
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.terraria_config.metadata[0].name
+            read_only  = true
           }
         }
       }
@@ -392,7 +422,7 @@ resource "kubernetes_deployment" "terraria_exporter" {
 resource "kubernetes_service" "terraria_exporter" {
   metadata {
     name      = "terraria-exporter"
-    namespace = kubernetes_namespace.monitoring.metadata[0].name
+    namespace = kubernetes_namespace.terraria.metadata[0].name
     labels = {
       app = "terraria-exporter"
     }
@@ -427,7 +457,7 @@ resource "kubernetes_manifest" "terraria_exporter_service_monitor" {
     }
     spec = {
       namespaceSelector = {
-        matchNames = [kubernetes_namespace.monitoring.metadata[0].name]
+        matchNames = [kubernetes_namespace.terraria.metadata[0].name]
       }
       selector = {
         matchLabels = {
@@ -513,117 +543,131 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
             "id": 1,
             "type": "stat",
             "title": "API Source Up",
-            "targets": [{"expr": "terraria_exporter_source_up"}],
+            "targets": [{"expr": "max(terraria_exporter_source_up)"}],
             "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0}
           },
           {
             "id": 2,
             "type": "stat",
-            "title": "Players Online",
-            "targets": [{"expr": "terraria_players_online"}],
+            "title": "World Parser Up",
+            "targets": [{"expr": "max(terraria_world_parser_up)"}],
             "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0}
           },
           {
             "id": 3,
             "type": "stat",
-            "title": "Players Max",
-            "targets": [{"expr": "terraria_players_max"}],
+            "title": "Players Online",
+            "targets": [{"expr": "max(terraria_players_online)"}],
             "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0}
           },
           {
             "id": 4,
             "type": "stat",
-            "title": "Hardmode",
-            "targets": [{"expr": "terraria_world_hardmode"}],
+            "title": "Players Max",
+            "targets": [{"expr": "max(terraria_players_max)"}],
             "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0}
           },
           {
             "id": 5,
             "type": "stat",
-            "title": "Blood Moon",
-            "targets": [{"expr": "terraria_world_blood_moon"}],
+            "title": "Hardmode",
+            "targets": [{"expr": "max(terraria_world_hardmode)"}],
             "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0}
           },
           {
             "id": 6,
             "type": "stat",
-            "title": "Eclipse",
-            "targets": [{"expr": "terraria_world_eclipse"}],
+            "title": "Blood Moon",
+            "targets": [{"expr": "max(terraria_world_blood_moon)"}],
             "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0}
           },
           {
             "id": 7,
-            "type": "timeseries",
-            "title": "Players Online Over Time",
-            "targets": [{"expr": "terraria_players_online"}],
-            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 4}
+            "type": "stat",
+            "title": "Eclipse",
+            "targets": [{"expr": "max(terraria_world_eclipse)"}],
+            "gridPos": {"h": 4, "w": 4, "x": 0, "y": 4}
           },
           {
             "id": 8,
             "type": "timeseries",
-            "title": "World Time",
-            "targets": [{"expr": "terraria_world_time"}],
-            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 4}
+            "title": "Players Online Over Time",
+            "targets": [{"expr": "max(terraria_players_online)", "legendFormat": "Players"}],
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8}
           },
           {
             "id": 9,
             "type": "timeseries",
-            "title": "Player Health",
-            "targets": [{"expr": "terraria_player_health"}],
-            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 4}
+            "title": "World Time",
+            "targets": [{"expr": "max(terraria_world_time)", "legendFormat": "World Time"}],
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8}
           },
           {
             "id": 10,
             "type": "timeseries",
-            "title": "Player Mana",
-            "targets": [{"expr": "terraria_player_mana"}],
-            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 12}
+            "title": "World Structures",
+            "targets": [
+              {"expr": "max(terraria_world_chests_total)", "legendFormat": "Chests"},
+              {"expr": "max(terraria_world_houses_total)", "legendFormat": "Houses"},
+              {"expr": "max(terraria_world_housed_npcs_total)", "legendFormat": "Housed NPCs"}
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8}
           },
           {
             "id": 11,
             "type": "timeseries",
-            "title": "Player Deaths Total",
-            "targets": [{"expr": "terraria_player_deaths_total"}],
-            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 12}
+            "title": "Player Health",
+            "targets": [{"expr": "max by (player) (terraria_player_health)"}],
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16}
           },
           {
             "id": 12,
-            "type": "barchart",
-            "title": "Monsters Active by Type",
-            "targets": [{"expr": "topk(15, terraria_monster_active)"}],
-            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12}
+            "type": "timeseries",
+            "title": "Player Mana",
+            "targets": [{"expr": "max by (player) (terraria_player_mana)"}],
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16}
           },
           {
             "id": 13,
-            "type": "table",
-            "title": "Player Items",
-            "targets": [{"expr": "topk(100, terraria_player_item_count)"}],
-            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+            "type": "timeseries",
+            "title": "Player Deaths Total",
+            "targets": [{"expr": "max by (player) (terraria_player_deaths_total)"}],
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16}
           },
           {
             "id": 14,
-            "type": "table",
-            "title": "Chest Items (Top 100)",
-            "targets": [{"expr": "topk(100, terraria_chest_item_count)"}],
-            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+            "type": "barchart",
+            "title": "Monsters Active by Type",
+            "targets": [{"expr": "topk(20, sum by (monster) (terraria_monster_active))"}],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
           },
           {
             "id": 15,
-            "type": "barchart",
-            "title": "Chest Items by Type (Top 20)",
-            "targets": [{"expr": "topk(20, terraria_chest_item_count_by_item)"}],
-            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28}
+            "type": "table",
+            "title": "Player Items",
+            "targets": [{"expr": "topk(100, sum by (player, item) (terraria_player_item_count))"}],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
           },
           {
             "id": 16,
-            "type": "timeseries",
-            "title": "World Structures",
-            "targets": [
-              {"expr": "terraria_world_chests_total", "legendFormat": "Chests"},
-              {"expr": "terraria_world_houses_total", "legendFormat": "Houses"},
-              {"expr": "terraria_world_housed_npcs_total", "legendFormat": "Housed NPCs"}
-            ],
-            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28}
+            "type": "table",
+            "title": "Chest Items (Top 100)",
+            "targets": [{"expr": "topk(100, sum by (chest, item) (terraria_chest_item_count))"}],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+          },
+          {
+            "id": 17,
+            "type": "barchart",
+            "title": "Chest Items by Type (Top 30)",
+            "targets": [{"expr": "topk(30, sum by (item) (terraria_chest_item_count_by_item))"}],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+          },
+          {
+            "id": 18,
+            "type": "table",
+            "title": "Housed NPCs",
+            "targets": [{"expr": "sum by (npc) (terraria_world_housed_npc)"}],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40}
           }
         ],
         "schemaVersion": 39,
@@ -632,7 +676,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
         "templating": {"list": []},
         "time": {"from": "now-6h", "to": "now"},
         "title": "Terraria Gameplay Overview",
-        "version": 1
+        "version": 2
       }
     EOT
   }

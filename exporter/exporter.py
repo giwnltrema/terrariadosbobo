@@ -1,17 +1,26 @@
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from prometheus_client import Gauge, start_http_server
+
+try:
+    from lihzahrd import World
+except Exception:
+    World = None
 
 API_BASE = os.getenv("TERRARIA_API_URL", "").rstrip("/")
 API_TOKEN = os.getenv("TERRARIA_API_TOKEN", "")
 SCRAPE_INTERVAL = int(os.getenv("SCRAPE_INTERVAL", "15"))
 EXPORTER_PORT = int(os.getenv("EXPORTER_PORT", "9150"))
+WORLD_FILE_PATH = os.getenv("WORLD_FILE_PATH", "")
+CHEST_ITEM_SERIES_LIMIT = int(os.getenv("CHEST_ITEM_SERIES_LIMIT", "500"))
 
 source_up = Gauge("terraria_exporter_source_up", "1 se API de gameplay respondeu")
+world_parser_up = Gauge("terraria_world_parser_up", "1 se parser do arquivo .wld respondeu")
 players_online = Gauge("terraria_players_online", "Quantidade de jogadores online")
 players_max = Gauge("terraria_players_max", "Capacidade maxima de jogadores")
 world_daytime = Gauge("terraria_world_daytime", "1 se dia, 0 se noite")
@@ -41,6 +50,13 @@ def _as_bool(value: Any) -> int:
         lowered = value.strip().lower()
         return 1 if lowered in {"1", "true", "yes", "on", "day", "hardmode"} else 0
     return 0
+
+
+def _normalize_name(value: Any) -> str:
+    raw = str(value or "unknown")
+    if raw == "unknown":
+        return raw
+    return raw.replace("_", " ").strip().title()
 
 
 def _find_first(data: Any, keys: List[str]) -> Optional[Any]:
@@ -93,6 +109,7 @@ def _extract_dict_list(payload: Any, keys: List[str]) -> List[Dict[str, Any]]:
                 return [i for i in value if isinstance(i, dict)]
     return []
 
+
 def _chest_items(chest: Dict[str, Any]) -> List[Dict[str, Any]]:
     for key in ["items", "inventory", "contents", "chestItems", "Slots", "slots"]:
         value = chest.get(key)
@@ -102,7 +119,7 @@ def _chest_items(chest: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _item_name(item: Dict[str, Any]) -> str:
-    return str(item.get("name") or item.get("itemName") or item.get("type") or "unknown")
+    return _normalize_name(item.get("name") or item.get("itemName") or item.get("type") or "unknown")
 
 
 def _item_amount(item: Dict[str, Any]) -> float:
@@ -111,8 +128,10 @@ def _item_amount(item: Dict[str, Any]) -> float:
         return float(amount)
     return 0.0
 
-def scrape_once() -> None:
+
+def _reset_metrics() -> None:
     source_up.set(0)
+    world_parser_up.set(0)
     players_online.set(0)
     players_max.set(0)
     world_daytime.set(0)
@@ -132,6 +151,8 @@ def scrape_once() -> None:
     player_items.clear()
     monster_count.clear()
 
+
+def _update_from_api() -> None:
     status = _request(["/status", "/v2/server/status", "/v3/server/status", "/v2/status"])
     players = _request(["/players", "/v2/players/list", "/v3/players/list", "/v2/players"])
     world = _request(["/world", "/v2/world/status", "/v3/world/status", "/v2/world"])
@@ -202,15 +223,15 @@ def scrape_once() -> None:
             for item in inventory:
                 if not isinstance(item, dict):
                     continue
-                item_name = str(item.get("name") or item.get("itemName") or "unknown")
-                amount = item.get("stack", item.get("amount", 0))
-                if isinstance(amount, (int, float)):
-                    player_items.labels(player=name, item=item_name).set(float(amount))
+                item_name = _item_name(item)
+                amount = _item_amount(item)
+                if amount > 0:
+                    player_items.labels(player=name, item=item_name).set(amount)
 
     parsed_monsters = _extract_dict_list(monsters, ["monsters", "npcs", "activeMonsters", "activeNPCs", "data"])
     bucket: Dict[str, int] = {}
     for monster in parsed_monsters:
-        mname = str(monster.get("name") or monster.get("npcName") or monster.get("type") or "unknown")
+        mname = _normalize_name(monster.get("name") or monster.get("npcName") or monster.get("type") or "unknown")
         bucket[mname] = bucket.get(mname, 0) + 1
     for mname, count in bucket.items():
         monster_count.labels(monster=mname).set(float(count))
@@ -218,7 +239,9 @@ def scrape_once() -> None:
     parsed_chests = _extract_dict_list(chests, ["chests", "data", "list"])
     if parsed_chests:
         world_chests.set(float(len(parsed_chests)))
-        item_totals: Dict[str, float] = {}
+        totals: Dict[str, float] = {}
+        chest_pairs: List[Tuple[str, str, float]] = []
+
         for chest in parsed_chests:
             chest_id = str(chest.get("id") or chest.get("index") or chest.get("name") or "unknown")
             for item in _chest_items(chest):
@@ -226,10 +249,13 @@ def scrape_once() -> None:
                 amount = _item_amount(item)
                 if amount <= 0:
                     continue
-                chest_item_count.labels(chest=chest_id, item=item_name).set(amount)
-                item_totals[item_name] = item_totals.get(item_name, 0.0) + amount
+                chest_pairs.append((chest_id, item_name, amount))
+                totals[item_name] = totals.get(item_name, 0.0) + amount
 
-        for item_name, total in item_totals.items():
+        chest_pairs.sort(key=lambda x: x[2], reverse=True)
+        for chest_id, item_name, amount in chest_pairs[:CHEST_ITEM_SERIES_LIMIT]:
+            chest_item_count.labels(chest=chest_id, item=item_name).set(amount)
+        for item_name, total in totals.items():
             chest_item_count_by_item.labels(item=item_name).set(total)
     else:
         chests_count = _find_first(chests if chests is not None else {}, ["chestcount", "chests", "count"])
@@ -248,7 +274,7 @@ def scrape_once() -> None:
     if parsed_housed_npcs:
         world_housed_npcs.set(float(len(parsed_housed_npcs)))
         for npc in parsed_housed_npcs:
-            nname = str(npc.get("name") or npc.get("npcName") or npc.get("type") or "unknown")
+            nname = _normalize_name(npc.get("name") or npc.get("npcName") or npc.get("type") or "unknown")
             world_housed_npc.labels(npc=nname).set(1)
     else:
         housed_count = _find_first(housed_npcs if housed_npcs is not None else {}, ["housednpccount", "npcs", "count"])
@@ -256,13 +282,104 @@ def scrape_once() -> None:
             world_housed_npcs.set(float(housed_count))
 
 
+def _update_from_world_file() -> None:
+    if World is None or not WORLD_FILE_PATH:
+        return
+
+    world_file = Path(WORLD_FILE_PATH)
+    if not world_file.exists() or not world_file.is_file():
+        return
+
+    world = World.create_from_file(str(world_file))
+    world_parser_up.set(1)
+
+    world_hardmode.set(1 if bool(getattr(world, "is_hardmode", False)) else 0)
+
+    time_data = getattr(world, "time", None)
+    if time_data is not None:
+        world_daytime.set(1 if bool(getattr(time_data, "is_daytime", False)) else 0)
+        current_time = getattr(time_data, "current", 0)
+        if isinstance(current_time, (int, float)):
+            world_time.set(float(current_time))
+
+    events_data = getattr(world, "events", None)
+    if events_data is not None:
+        world_blood_moon.set(1 if bool(getattr(events_data, "blood_moon", False)) else 0)
+        world_eclipse.set(1 if bool(getattr(events_data, "solar_eclipse", False)) else 0)
+
+    chests = list(getattr(world, "chests", []) or [])
+    world_chests.set(float(len(chests)))
+
+    item_totals: Dict[str, float] = {}
+    chest_pairs: List[Tuple[str, str, float]] = []
+
+    for index, chest in enumerate(chests):
+        chest_label = str(index)
+        contents = list(getattr(chest, "contents", []) or [])
+        for stack in contents:
+            if stack is None:
+                continue
+            quantity = getattr(stack, "quantity", 0)
+            if not isinstance(quantity, (int, float)):
+                continue
+            quantity_value = float(quantity)
+            if quantity_value <= 0:
+                continue
+
+            item_type = getattr(stack, "type", None)
+            item_name = _normalize_name(getattr(item_type, "name", item_type))
+
+            chest_pairs.append((chest_label, item_name, quantity_value))
+            item_totals[item_name] = item_totals.get(item_name, 0.0) + quantity_value
+
+    chest_pairs.sort(key=lambda x: x[2], reverse=True)
+    for chest_label, item_name, quantity_value in chest_pairs[:CHEST_ITEM_SERIES_LIMIT]:
+        chest_item_count.labels(chest=chest_label, item=item_name).set(quantity_value)
+
+    for item_name, total in item_totals.items():
+        chest_item_count_by_item.labels(item=item_name).set(total)
+
+    rooms = list(getattr(world, "rooms", []) or [])
+    world_houses.set(float(len(rooms)))
+
+    housed_count = 0
+    npcs = list(getattr(world, "npcs", []) or [])
+    for npc in npcs:
+        if getattr(npc, "home", None) is None:
+            continue
+        housed_count += 1
+        npc_name = str(getattr(npc, "name", "") or _normalize_name(getattr(getattr(npc, "type", None), "name", "unknown")))
+        world_housed_npc.labels(npc=npc_name).set(1)
+
+    if housed_count == 0 and rooms:
+        # fallback: alguns mundos tem rooms sem home resolvido nos NPCs
+        for room in rooms:
+            room_npc = getattr(room, "npc", None)
+            room_npc_name = _normalize_name(getattr(room_npc, "name", room_npc))
+            world_housed_npc.labels(npc=room_npc_name).set(1)
+        housed_count = len(rooms)
+
+    world_housed_npcs.set(float(housed_count))
+
+
+def scrape_once() -> None:
+    _reset_metrics()
+
+    try:
+        _update_from_api()
+    except Exception:
+        source_up.set(0)
+
+    try:
+        _update_from_world_file()
+    except Exception:
+        world_parser_up.set(0)
+
+
 def main() -> None:
     start_http_server(EXPORTER_PORT)
     while True:
-        try:
-            scrape_once()
-        except Exception:
-            source_up.set(0)
+        scrape_once()
         time.sleep(SCRAPE_INTERVAL)
 
 
