@@ -145,7 +145,7 @@ kubectl wait --for=condition=Ready "pod/$MANAGER_POD_NAME" -n "$NAMESPACE" --tim
 
 exists_output="$(kubectl exec -n "$NAMESPACE" "$MANAGER_POD_NAME" -- sh -lc "if [ -f '/config/$WORLD_NAME' ]; then echo exists; else echo missing; fi")"
 world_exists="false"
-if [[ "${exists_output}" == "exists" ]]; then
+if [[ "$exists_output" == "exists" ]]; then
   world_exists="true"
 fi
 
@@ -156,19 +156,50 @@ if [[ -n "$WORLD_FILE" ]]; then
 elif [[ "$world_exists" != "true" && "$AUTO_CREATE_IF_MISSING" == "true" ]]; then
   echo "Mundo '$WORLD_NAME' nao existe. Criando automaticamente (size=$WORLD_SIZE, difficulty=$DIFFICULTY, maxplayers=$MAX_PLAYERS)..."
 
-  seed_arg=""
-  if [[ -n "$SEED" ]]; then
-    seed_arg="-seed \"$SEED\""
+  cat <<'EOS' | kubectl exec -i -n "$NAMESPACE" "$MANAGER_POD_NAME" -- sh -s -- "/config/$WORLD_NAME" "$WORLD_BASE_NAME" "$WORLD_SIZE_NUMBER" "$DIFFICULTY_NUMBER" "$MAX_PLAYERS" "$SERVER_PORT" "$SEED" "$EXTRA_CREATE_ARGS" >/dev/null
+set -eu
+
+WORLD_PATH="$1"
+WORLD_NAME="$2"
+WORLD_SIZE="$3"
+WORLD_DIFFICULTY="$4"
+MAX_PLAYERS="$5"
+SERVER_PORT="$6"
+WORLD_SEED="$7"
+EXTRA_CREATE_ARGS="$8"
+
+CMD="./TerrariaServer -x64 -autocreate \"$WORLD_SIZE\" -world \"$WORLD_PATH\" -worldname \"$WORLD_NAME\" -difficulty \"$WORLD_DIFFICULTY\" -maxplayers \"$MAX_PLAYERS\" -port \"$SERVER_PORT\""
+
+if [ -n "$WORLD_SEED" ]; then
+  CMD="$CMD -seed \"$WORLD_SEED\""
+fi
+
+if [ -n "$EXTRA_CREATE_ARGS" ]; then
+  CMD="$CMD $EXTRA_CREATE_ARGS"
+fi
+
+sh -c "$CMD >/tmp/worldgen.log 2>&1" &
+pid=$!
+
+i=0
+while [ $i -lt 120 ]; do
+  if [ -f "$WORLD_PATH" ]; then
+    break
   fi
+  i=$((i+1))
+  sleep 2
+done
 
-  extra_args=""
-  if [[ -n "$EXTRA_CREATE_ARGS" ]]; then
-    extra_args="$EXTRA_CREATE_ARGS"
-  fi
+kill "$pid" >/dev/null 2>&1 || true
+wait "$pid" >/dev/null 2>&1 || true
 
-  create_cmd="WORLD_PATH=\"/config/$WORLD_NAME\"; WORLD_NAME=\"$WORLD_BASE_NAME\"; CMD=\"./TerrariaServer -x64 -autocreate $WORLD_SIZE_NUMBER -world \\\"\\$WORLD_PATH\\\" -worldname \\\"\\$WORLD_NAME\\\" -difficulty $DIFFICULTY_NUMBER -maxplayers $MAX_PLAYERS -port $SERVER_PORT $seed_arg $extra_args\"; eval \"\\$CMD >/tmp/worldgen.log 2>&1 &\"; pid=\\$!; i=0; while [ \\$i -lt 120 ]; do if [ -f \\"\\$WORLD_PATH\\" ]; then break; fi; i=\\$((i+1)); sleep 2; done; kill \\$pid >/dev/null 2>&1 || true; wait \\$pid >/dev/null 2>&1 || true; if [ ! -f \\"\\$WORLD_PATH\\" ]; then echo \"Falha ao criar mundo automaticamente\" >&2; cat /tmp/worldgen.log >&2 || true; exit 1; fi"
+if [ ! -f "$WORLD_PATH" ]; then
+  echo "Falha ao criar mundo automaticamente" >&2
+  cat /tmp/worldgen.log >&2 || true
+  exit 1
+fi
+EOS
 
-  kubectl exec -n "$NAMESPACE" "$MANAGER_POD_NAME" -- sh -lc "$create_cmd" >/dev/null
   world_exists="true"
 fi
 
