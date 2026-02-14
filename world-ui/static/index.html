@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Terraria World Creator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="sky"></div>
+  <div class="mountains"></div>
+  <main class="app-shell">
+    <header class="hero">
+      <h1>TERRARIA WORLD CREATOR</h1>
+      <p>Local map generation wizard for your Kubernetes server</p>
+    </header>
+
+    <section class="panel">
+      <div class="row">
+        <label>
+          <span>World Name (.wld)</span>
+          <input id="worldName" type="text" value="test.wld" placeholder="my_world.wld">
+        </label>
+        <label>
+          <span>Manual Seed (optional)</span>
+          <input id="manualSeed" type="text" placeholder="leave empty for random">
+        </label>
+      </div>
+
+      <div class="row">
+        <div>
+          <span class="group-title">World Size</span>
+          <div class="choice-grid" id="sizeChoices">
+            <button data-value="small">Small</button>
+            <button data-value="medium" class="active">Medium</button>
+            <button data-value="large">Large</button>
+          </div>
+        </div>
+        <div>
+          <span class="group-title">Difficulty</span>
+          <div class="choice-grid" id="difficultyChoices">
+            <button data-value="journey">Journey</button>
+            <button data-value="classic" class="active">Classic</button>
+            <button data-value="expert">Expert</button>
+            <button data-value="master">Master</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <span class="group-title">World Evil</span>
+          <div class="choice-grid" id="evilChoices">
+            <button data-value="random" class="active">Random</button>
+            <button data-value="corruption">Corruption</button>
+            <button data-value="crimson">Crimson</button>
+          </div>
+        </div>
+        <div>
+          <span class="group-title">Special Seeds</span>
+          <div class="seed-actions">
+            <button id="openSeedModal" class="secondary">Open seed library</button>
+            <button id="clearSeeds" class="ghost">Clear selected</button>
+          </div>
+          <p id="selectedSeedsLabel" class="seed-summary">No special seeds selected</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <label>
+          <span>Max Players</span>
+          <input id="maxPlayers" type="number" min="1" max="255" value="8">
+        </label>
+        <label>
+          <span>Server Port</span>
+          <input id="serverPort" type="number" min="1" max="65535" value="7777">
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="full-width">
+          <span>Extra create args (optional)</span>
+          <input id="extraArgs" type="text" placeholder="example: -npcstream">
+        </label>
+      </div>
+
+      <div class="seed-preview">
+        <strong>Resolved Seed:</strong>
+        <span id="resolvedSeed">(random)</span>
+      </div>
+
+      <div class="actions">
+        <button id="createWorld" class="primary">Create world on PVC</button>
+      </div>
+    </section>
+
+    <section class="terminal panel">
+      <div class="terminal-header">
+        <strong>Execution output</strong>
+        <span id="runStatus" class="status idle">idle</span>
+      </div>
+      <pre id="output">Waiting for command...</pre>
+    </section>
+  </main>
+
+  <div id="seedModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Special Seeds">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Special Seed Library</h2>
+        <button id="closeSeedModal" class="ghost">Close</button>
+      </div>
+      <input id="seedSearch" type="text" placeholder="Search seed presets">
+      <div id="seedList" class="seed-list"></div>
+      <div class="modal-actions">
+        <button id="applySeeds" class="primary">Apply selected seeds</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
+

@@ -182,6 +182,7 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 | Deploy stack | `./scripts/deploy.ps1` | `bash ./scripts/deploy.sh` |
 | Deploy with first-world options | `./scripts/deploy.ps1 -WorldName "test.wld" -WorldSize large -MaxPlayers 16 -Difficulty expert -Seed "seed-123"` | `bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 16 --difficulty expert --seed seed-123` |
 | Upload world file | `./scripts/upload-world.ps1 -WorldFile "C:/path/map.wld"` | `bash ./scripts/upload-world.sh --world-file /c/path/map.wld` |
+| World creator UI (theme) | `./scripts/world-creator-ui.ps1` | `bash ./scripts/world-creator-ui.sh` |
 | Auto-create world if missing | `./scripts/upload-world.ps1 -WorldName "test.wld"` | `bash ./scripts/upload-world.sh --world-name test.wld` |
 | Check pods | `kubectl get pods -A` | `kubectl get pods -A` |
 | Terraria logs | `kubectl -n terraria logs deploy/terraria-server --tail=200` | `kubectl -n terraria logs deploy/terraria-server --tail=200` |
@@ -206,6 +207,28 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 Capture guide: `docs/screenshots/README.md`
 
 ## World management
+
+Terraria styled world creator UI (local web app):
+
+```powershell
+./scripts/world-creator-ui.ps1
+```
+
+```bash
+bash ./scripts/world-creator-ui.sh
+```
+
+Open `http://127.0.0.1:8787` and create worlds visually with:
+
+- world name
+- size
+- difficulty
+- world evil
+- manual seed
+- special seed library (multi-select)
+- max players
+
+Multi-selecting special seeds resolves to `get fixed boi` (Zenith mode), matching the combined-special behavior.
 
 Upload existing map:
 
@@ -291,7 +314,12 @@ Notes:
 |   |-- deploy.ps1
 |   |-- deploy.sh
 |   |-- upload-world.ps1
-|   `-- upload-world.sh
+|   |-- upload-world.sh
+|   |-- world-creator-ui.ps1
+|   `-- world-creator-ui.sh
+|-- world-ui/
+|   |-- server.py
+|   `-- static/
 `-- terraform/
     |-- main.tf
     |-- addons.tf
@@ -331,9 +359,4 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
-
-
-
-
-
 

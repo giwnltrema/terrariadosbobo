@@ -182,6 +182,7 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 | Subir stack | `./scripts/deploy.ps1` | `bash ./scripts/deploy.sh` |
 | Subir com bootstrap de mundo | `./scripts/deploy.ps1 -WorldName "test.wld" -WorldSize large -MaxPlayers 16 -Difficulty expert -Seed "seed-123"` | `bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 16 --difficulty expert --seed seed-123` |
 | Upload de mundo | `./scripts/upload-world.ps1 -WorldFile "C:/caminho/map.wld"` | `bash ./scripts/upload-world.sh --world-file /c/caminho/map.wld` |
+| UI visual de criacao de mundo | `./scripts/world-creator-ui.ps1` | `bash ./scripts/world-creator-ui.sh` |
 | Criar mundo se nao existir | `./scripts/upload-world.ps1 -WorldName "test.wld"` | `bash ./scripts/upload-world.sh --world-name test.wld` |
 | Ver pods | `kubectl get pods -A` | `kubectl get pods -A` |
 | Logs do Terraria | `kubectl -n terraria logs deploy/terraria-server --tail=200` | `kubectl -n terraria logs deploy/terraria-server --tail=200` |
@@ -206,6 +207,28 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 Guia de captura: `docs/screenshots/README.md`
 
 ## Gerenciamento de mundo
+
+UI visual tematica Terraria para criacao de mundo (app web local):
+
+```powershell
+./scripts/world-creator-ui.ps1
+```
+
+```bash
+bash ./scripts/world-creator-ui.sh
+```
+
+Abra `http://127.0.0.1:8787` e crie mapas visualmente com:
+
+- nome do mundo
+- tamanho
+- dificuldade
+- tipo de evil
+- seed manual
+- biblioteca de seeds especiais (multi-select)
+- maximo de players
+
+Ao selecionar multiplas seeds especiais, a UI resolve para `get fixed boi` (modo Zenith), seguindo o comportamento de combinacao.
 
 Upload de mapa existente:
 
@@ -291,7 +314,12 @@ Notas:
 |   |-- deploy.ps1
 |   |-- deploy.sh
 |   |-- upload-world.ps1
-|   `-- upload-world.sh
+|   |-- upload-world.sh
+|   |-- world-creator-ui.ps1
+|   `-- world-creator-ui.sh
+|-- world-ui/
+|   |-- server.py
+|   `-- static/
 `-- terraform/
     |-- main.tf
     |-- addons.tf
@@ -331,9 +359,4 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
-
-
-
-
-
 
