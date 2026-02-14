@@ -59,6 +59,36 @@ cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 - `grafana_github_oauth_*` (login GitHub no Grafana)
 - `terraria_world_parse_interval_seconds`
 - `terraria_chest_item_series_limit`
+4. Auto-config dinamica (recomendado):
+
+Os scripts `deploy.ps1` e `deploy.sh` geram `terraform/local.auto.tfvars` automaticamente (arquivo ignorado no git) com:
+
+- `argocd_app_repo_url` baseado no `git remote origin` do clone atual
+- `argocd_app_name` derivado do nome do repo
+- opcionalmente credenciais de repo Argo CD e OAuth GitHub do Grafana via variaveis de ambiente
+
+Variaveis de ambiente suportadas:
+
+- Argo CD repo: `ARGOCD_APP_REPO_URL`, `ARGOCD_REPO_USERNAME`, `ARGOCD_REPO_PASSWORD`, `ARGOCD_REPO_SSH_PRIVATE_KEY`
+- Grafana GitHub OAuth: `GRAFANA_GITHUB_OAUTH_ENABLED`, `GRAFANA_GITHUB_CLIENT_ID`, `GRAFANA_GITHUB_CLIENT_SECRET`, `GRAFANA_GITHUB_ALLOWED_ORGS` (csv)
+
+Exemplo (PowerShell):
+
+```powershell
+$env:GRAFANA_GITHUB_OAUTH_ENABLED = "true"
+$env:GRAFANA_GITHUB_CLIENT_ID = "seu-client-id"
+$env:GRAFANA_GITHUB_CLIENT_SECRET = "seu-client-secret"
+$env:GRAFANA_GITHUB_ALLOWED_ORGS = "sua-org"
+```
+
+Exemplo (Bash):
+
+```bash
+export GRAFANA_GITHUB_OAUTH_ENABLED=true
+export GRAFANA_GITHUB_CLIENT_ID="seu-client-id"
+export GRAFANA_GITHUB_CLIENT_SECRET="seu-client-secret"
+export GRAFANA_GITHUB_ALLOWED_ORGS="sua-org"
+```
 
 ## Deploy (Windows)
 

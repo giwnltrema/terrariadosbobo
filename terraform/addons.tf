@@ -1,3 +1,18 @@
+locals {
+  argocd_repo_url_trimmed = trimspace(var.argocd_app_repo_url)
+  argocd_repo_configured  = local.argocd_repo_url_trimmed != ""
+
+  argocd_repo_secret_data = merge(
+    {
+      type = "git"
+      url  = local.argocd_repo_url_trimmed
+    },
+    var.argocd_repo_username != "" ? { username = var.argocd_repo_username } : {},
+    var.argocd_repo_password != "" ? { password = var.argocd_repo_password } : {},
+    var.argocd_repo_ssh_private_key != "" ? { sshPrivateKey = var.argocd_repo_ssh_private_key } : {}
+  )
+}
+
 resource "kubernetes_namespace" "argocd" {
   count = var.argocd_enabled ? 1 : 0
 
@@ -108,6 +123,25 @@ resource "helm_release" "argocd" {
   ]
 }
 
+resource "kubernetes_secret" "argocd_repository" {
+  count = var.argocd_enabled && local.argocd_repo_configured ? 1 : 0
+
+  metadata {
+    name      = "argocd-repo-${substr(sha1(local.argocd_repo_url_trimmed), 0, 8)}"
+    namespace = var.argocd_namespace
+    labels = {
+      "argocd.argoproj.io/secret-type" = "repository"
+    }
+  }
+
+  data = local.argocd_repo_secret_data
+  type = "Opaque"
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
 resource "kubernetes_persistent_volume_claim" "terraria_backups" {
   count = var.terraria_backup_enabled ? 1 : 0
 
@@ -151,8 +185,8 @@ resource "kubernetes_cron_job_v1" "terraria_world_backup" {
             restart_policy = "OnFailure"
 
             container {
-              name  = "backup"
-              image = "alpine:3.20"
+              name    = "backup"
+              image   = "alpine:3.20"
               command = ["sh", "-c"]
               args = [
                 "set -eu; ts=$(date +%Y%m%d-%H%M%S); tar -czf /backups/world-$${ts}.tar.gz -C /config .; ls -1t /backups/world-*.tar.gz | tail -n +$(( $${RETENTION_COUNT} + 1 )) | xargs -r rm -f"
@@ -255,9 +289,8 @@ resource "kubernetes_manifest" "terraria_alert_rules" {
   ]
 }
 
-
 resource "kubernetes_manifest" "argocd_bootstrap_application" {
-  count = var.argocd_enabled && var.argocd_app_enabled ? 1 : 0
+  count = var.argocd_enabled && var.argocd_app_enabled && local.argocd_repo_configured ? 1 : 0
 
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
@@ -269,7 +302,7 @@ resource "kubernetes_manifest" "argocd_bootstrap_application" {
     spec = {
       project = "default"
       source = {
-        repoURL        = var.argocd_app_repo_url
+        repoURL        = local.argocd_repo_url_trimmed
         targetRevision = var.argocd_app_target_revision
         path           = var.argocd_app_path
       }
@@ -290,6 +323,7 @@ resource "kubernetes_manifest" "argocd_bootstrap_application" {
   }
 
   depends_on = [
-    helm_release.argocd
+    helm_release.argocd,
+    kubernetes_secret.argocd_repository
   ]
 }

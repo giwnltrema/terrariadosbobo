@@ -233,9 +233,29 @@ variable "argocd_app_name" {
 }
 
 variable "argocd_app_repo_url" {
-  description = "Repositorio Git para Application bootstrap do Argo CD"
+  description = "Repositorio Git para Application bootstrap do Argo CD (vazio = scripts/deploy.* tentam detectar remote.origin.url)"
   type        = string
-  default     = "https://github.com/giwnltrema/terrariadosbobo.git"
+  default     = ""
+}
+
+variable "argocd_repo_username" {
+  description = "Usuario para autenticar repositorio Git no Argo CD (opcional)"
+  type        = string
+  default     = ""
+}
+
+variable "argocd_repo_password" {
+  description = "Senha/token para autenticar repositorio Git no Argo CD (opcional)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "argocd_repo_ssh_private_key" {
+  description = "Chave SSH privada para autenticar repositorio Git no Argo CD (opcional)"
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "argocd_app_target_revision" {
@@ -249,3 +269,4 @@ variable "argocd_app_path" {
   type        = string
   default     = "argocd/apps/bootstrap"
 }
+
