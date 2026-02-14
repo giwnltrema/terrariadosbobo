@@ -135,7 +135,7 @@ resource "kubernetes_config_map" "grafana_logs_dashboards" {
               "label": "Pod",
               "type": "query",
               "datasource": {"type": "loki", "uid": "loki"},
-              "query": {"query": "label_values({namespace=~\\"$namespace\\"}, pod)", "refId": "LokiPodVar"},
+              "query": {"query": "label_values({namespace=~\"$namespace\"}, pod)", "refId": "LokiPodVar"},
               "refresh": 2,
               "includeAll": true,
               "multi": true,
@@ -146,7 +146,7 @@ resource "kubernetes_config_map" "grafana_logs_dashboards" {
               "label": "Container",
               "type": "query",
               "datasource": {"type": "loki", "uid": "loki"},
-              "query": {"query": "label_values({namespace=~\\"$namespace\\", pod=~\\"$pod\\"}, container)", "refId": "LokiContainerVar"},
+              "query": {"query": "label_values({namespace=~\"$namespace\", pod=~\"$pod\"}, container)", "refId": "LokiContainerVar"},
               "refresh": 2,
               "includeAll": true,
               "multi": true,
@@ -169,7 +169,7 @@ resource "kubernetes_config_map" "grafana_logs_dashboards" {
             "targets": [
               {
                 "refId": "A",
-                "expr": "{namespace=~\\"$namespace\\", pod=~\\"$pod\\", container=~\\"$container\\"} |= \\"$search\\"",
+                "expr": "{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"} |= \"$search\"",
                 "queryType": "range"
               }
             ],
@@ -192,7 +192,7 @@ resource "kubernetes_config_map" "grafana_logs_dashboards" {
             "targets": [
               {
                 "refId": "A",
-                "expr": "{namespace=\\"terraria\\"}",
+                "expr": "{namespace=\"terraria\"}",
                 "queryType": "range"
               }
             ],
@@ -214,7 +214,7 @@ resource "kubernetes_config_map" "grafana_logs_dashboards" {
             "targets": [
               {
                 "refId": "A",
-                "expr": "{namespace=\\"argocd\\"}",
+                "expr": "{namespace=\"argocd\"}",
                 "queryType": "range"
               }
             ],
@@ -236,7 +236,7 @@ resource "kubernetes_config_map" "grafana_logs_dashboards" {
             "targets": [
               {
                 "refId": "A",
-                "expr": "{namespace=\\"monitoring\\"}",
+                "expr": "{namespace=\"monitoring\"}",
                 "queryType": "range"
               }
             ],
@@ -258,7 +258,7 @@ resource "kubernetes_config_map" "grafana_logs_dashboards" {
             "targets": [
               {
                 "refId": "A",
-                "expr": "topk(10, sum by (namespace, pod) (count_over_time({namespace=~\\"terraria|argocd|monitoring\\"}[5m])))"
+                "expr": "topk(10, sum by (namespace, pod) (count_over_time({namespace=~\"terraria|argocd|monitoring\"}[5m])))"
               }
             ],
             "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}
@@ -509,4 +509,6 @@ resource "kubernetes_manifest" "argocd_bootstrap_application" {
     kubernetes_secret.argocd_repository
   ]
 }
+
+
 

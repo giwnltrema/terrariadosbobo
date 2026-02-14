@@ -214,11 +214,13 @@ resource "helm_release" "kube_prometheus_stack" {
         }
         sidecar = {
           dashboards = {
-            enabled = true
-            label   = "grafana_dashboard"
+            enabled         = true
+            label           = "grafana_dashboard"
+            searchNamespace = var.monitoring_namespace
           }
           datasources = {
-            enabled = true
+            enabled         = true
+            searchNamespace = var.monitoring_namespace
           }
         }
         "grafana.ini" = {
@@ -233,7 +235,7 @@ resource "helm_release" "kube_prometheus_stack" {
             allow_sign_up         = true
             client_id             = var.grafana_github_client_id
             client_secret         = var.grafana_github_client_secret
-            scopes                = "read:user,user:email"
+            scopes                = "read:user,user:email,read:org"
             auth_url              = "https://github.com/login/oauth/authorize"
             token_url             = "https://github.com/login/oauth/access_token"
             api_url               = "https://api.github.com/user"
@@ -507,28 +509,28 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
             "id": 1,
             "type": "timeseries",
             "title": "Terraria Pod CPU (cores)",
-            "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\\"terraria\\",pod=~\\"terraria-server-.*\\",container!=\\"\\"}[5m]))"}],
+            "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"terraria\",pod=~\"terraria-server-.*\",container!=\"\"}[5m]))"}],
             "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
           },
           {
             "id": 2,
             "type": "timeseries",
             "title": "Terraria Pod Memory (bytes)",
-            "targets": [{"expr": "sum(container_memory_working_set_bytes{namespace=\\"terraria\\",pod=~\\"terraria-server-.*\\",container!=\\"\\"})"}],
+            "targets": [{"expr": "sum(container_memory_working_set_bytes{namespace=\"terraria\",pod=~\"terraria-server-.*\",container!=\"\"})"}],
             "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
           },
           {
             "id": 3,
             "type": "stat",
             "title": "Terraria TCP Reachability",
-            "targets": [{"expr": "probe_success{job=\\"terraria-tcp-probe\\"}"}],
+            "targets": [{"expr": "probe_success{job=\"terraria-tcp-probe\"}"}],
             "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8}
           },
           {
             "id": 4,
             "type": "timeseries",
             "title": "Terraria Pod Restarts",
-            "targets": [{"expr": "sum(kube_pod_container_status_restarts_total{namespace=\\"terraria\\",pod=~\\"terraria-server-.*\\"})"}],
+            "targets": [{"expr": "sum(kube_pod_container_status_restarts_total{namespace=\"terraria\",pod=~\"terraria-server-.*\"})"}],
             "gridPos": {"h": 6, "w": 16, "x": 8, "y": 8}
           }
         ],
@@ -822,6 +824,9 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
+
+
 
 
 
