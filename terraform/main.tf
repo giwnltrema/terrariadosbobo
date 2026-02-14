@@ -143,6 +143,7 @@ resource "helm_release" "kube_prometheus_stack" {
   namespace        = kubernetes_namespace.monitoring.metadata[0].name
   create_namespace = false
   timeout          = 1200
+  wait             = false
 
   values = [
     yamlencode({
