@@ -8,6 +8,10 @@
 </p>
 
 <p align="center">
+  <img alt="Terraria Animated Banner" src="docs/branding/terraria-animated-banner.svg">
+</p>
+
+<p align="center">
   <img alt="Terraform" src="https://img.shields.io/badge/Terraform-IaC-623CE4?style=flat-square&logo=terraform&logoColor=white">
   <img alt="Kubernetes" src="https://img.shields.io/badge/Kubernetes-Local%20Cluster-326CE5?style=flat-square&logo=kubernetes&logoColor=white">
   <img alt="Grafana" src="https://img.shields.io/badge/Grafana-Dashboards-F46800?style=flat-square&logo=grafana&logoColor=white">
@@ -26,6 +30,7 @@ Production-style local stack for a Terraria server with observability, backups, 
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
 - [Access URLs](#access-urls)
+- [Cross-platform command matrix](#cross-platform-command-matrix)
 - [Screenshots](#screenshots)
 - [World management](#world-management)
 - [Observability](#observability)
@@ -128,6 +133,15 @@ $env:GRAFANA_GITHUB_CLIENT_SECRET = "your-client-secret"
 $env:GRAFANA_GITHUB_ALLOWED_ORGS = "your-org"
 ```
 
+Example (Bash):
+
+```bash
+export GRAFANA_GITHUB_OAUTH_ENABLED=true
+export GRAFANA_GITHUB_CLIENT_ID="your-client-id"
+export GRAFANA_GITHUB_CLIENT_SECRET="your-client-secret"
+export GRAFANA_GITHUB_ALLOWED_ORGS="your-org"
+```
+
 ### 3) Deploy
 
 Windows:
@@ -161,8 +175,20 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 | Argo CD | `http://localhost:30080` |
 | Terraria server | `YOUR_LAN_IP:30777` |
 
-## Screenshots
+## Cross-platform command matrix
 
+| Task | Windows (PowerShell) | Linux/WSL (Bash) |
+|---|---|---|
+| Deploy stack | `./scripts/deploy.ps1` | `bash ./scripts/deploy.sh` |
+| Deploy with first-world options | `./scripts/deploy.ps1 -WorldName "test.wld" -WorldSize large -MaxPlayers 16 -Difficulty expert -Seed "seed-123"` | `bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 16 --difficulty expert --seed seed-123` |
+| Upload world file | `./scripts/upload-world.ps1 -WorldFile "C:/path/map.wld"` | `bash ./scripts/upload-world.sh --world-file /c/path/map.wld` |
+| Auto-create world if missing | `./scripts/upload-world.ps1 -WorldName "test.wld"` | `bash ./scripts/upload-world.sh --world-name test.wld` |
+| Check pods | `kubectl get pods -A` | `kubectl get pods -A` |
+| Terraria logs | `kubectl -n terraria logs deploy/terraria-server --tail=200` | `kubectl -n terraria logs deploy/terraria-server --tail=200` |
+| ArgoCD admin password | `[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}")))` | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo` |
+| Destroy stack | `terraform -chdir=terraform destroy -auto-approve` | `terraform -chdir=terraform destroy -auto-approve` |
+
+## Screenshots
 > Visual gallery is sourced from `docs/screenshots/`. Replace placeholders with real screenshots from your environment.
 
 | Grafana K8s | Grafana Gameplay |
@@ -305,6 +331,7 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
+
 
 
 
