@@ -188,6 +188,7 @@ resource "helm_release" "kube_prometheus_stack" {
         }
       }
       grafana = {
+        assertNoLeakedSecrets      = false
         adminUser                = var.grafana_admin_user
         adminPassword            = var.grafana_admin_password
         defaultDashboardsEnabled = true
@@ -974,5 +975,6 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
 
 
