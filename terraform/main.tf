@@ -145,7 +145,51 @@ resource "helm_release" "kube_prometheus_stack" {
   values = [
     yamlencode({
       alertmanager = {
-        enabled = false
+        enabled = true
+        alertmanagerSpec = {
+          storage = {
+            volumeClaimTemplate = {
+              spec = {
+                storageClassName = var.monitoring_storage_class
+                accessModes      = ["ReadWriteOnce"]
+                resources = {
+                  requests = {
+                    storage = "5Gi"
+                  }
+                }
+              }
+            }
+          }
+        }
+        config = var.discord_webhook_url != "" ? {
+          route = {
+            receiver        = "discord"
+            group_by        = ["alertname"]
+            group_wait      = "30s"
+            group_interval  = "5m"
+            repeat_interval = "4h"
+          }
+          receivers = [
+            {
+              name = "discord"
+              webhook_configs = [
+                {
+                  url           = var.discord_webhook_url
+                  send_resolved = true
+                }
+              ]
+            }
+          ]
+        } : {
+          route = {
+            receiver = "null"
+          }
+          receivers = [
+            {
+              name = "null"
+            }
+          ]
+        }
       }
       grafana = {
         adminUser                = var.grafana_admin_user
@@ -155,6 +199,12 @@ resource "helm_release" "kube_prometheus_stack" {
           type     = "NodePort"
           nodePort = var.grafana_node_port
         }
+        persistence = {
+          enabled          = true
+          storageClassName = var.monitoring_storage_class
+          accessModes      = ["ReadWriteOnce"]
+          size             = var.grafana_persistence_size
+        }
         sidecar = {
           dashboards = {
             enabled = true
@@ -162,6 +212,25 @@ resource "helm_release" "kube_prometheus_stack" {
           }
           datasources = {
             enabled = true
+          }
+        }
+        "grafana.ini" = {
+          server = {
+            root_url = "http://localhost:${var.grafana_node_port}"
+          }
+          auth = {
+            disable_login_form = var.grafana_github_oauth_enabled
+          }
+          "auth.github" = {
+            enabled               = var.grafana_github_oauth_enabled
+            allow_sign_up         = true
+            client_id             = var.grafana_github_client_id
+            client_secret         = var.grafana_github_client_secret
+            scopes                = "read:user,user:email"
+            auth_url              = "https://github.com/login/oauth/authorize"
+            token_url             = "https://github.com/login/oauth/access_token"
+            api_url               = "https://api.github.com/user"
+            allowed_organizations = join(" ", var.grafana_github_allowed_organizations)
           }
         }
       }
@@ -187,6 +256,19 @@ resource "helm_release" "kube_prometheus_stack" {
           serviceMonitorSelectorNilUsesHelmValues = false
           podMonitorSelectorNilUsesHelmValues     = false
           ruleSelectorNilUsesHelmValues           = false
+          storageSpec = {
+            volumeClaimTemplate = {
+              spec = {
+                storageClassName = var.monitoring_storage_class
+                accessModes      = ["ReadWriteOnce"]
+                resources = {
+                  requests = {
+                    storage = var.prometheus_persistence_size
+                  }
+                }
+              }
+            }
+          }
         }
       }
     })

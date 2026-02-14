@@ -1,60 +1,49 @@
 # terrariadosbobo
 
-Servidor local de Terraria em Kubernetes com Terraform, Prometheus e Grafana, incluindo dashboard de gameplay.
+Stack local de Terraria com Kubernetes + Terraform + observabilidade + GitOps.
 
-## O que este projeto sobe
+## O que foi integrado
 
-- Servidor Terraria (`terraria` namespace)
-- PVC para mundo/config (`terraria-config`)
-- Service NodePort para jogo (`30777` por padrao)
-- `kube-prometheus-stack` (`monitoring` namespace)
-- `blackbox-exporter` (saude TCP do server)
-- `terraria-exporter` custom (metricas de gameplay)
+- Servidor Terraria em `terraria`
+- PVC de mundo (`terraria-config`)
+- Backup automático do mundo (`CronJob` + PVC `terraria-backups`)
+- Prometheus + Grafana + Alertmanager (`kube-prometheus-stack`)
+- Node exporter / kube-state-metrics
+- Blackbox probe TCP do Terraria
+- Exporter custom de gameplay (players/mundo/monstros/itens)
 - Dashboards Grafana:
   - `Terraria K8s Overview`
   - `Terraria Gameplay Overview`
+- Loki + Promtail para logs
+- Argo CD (GitOps) via NodePort
+- OAuth GitHub opcional no Grafana
+- Alertas no Discord via Alertmanager (opcional)
 
-## Stack de gameplay metrics
+## URLs locais
 
-O exporter de gameplay consulta API do servidor (TShock/API compatível) e publica no Prometheus:
-
-- `terraria_players_online`
-- `terraria_players_max`
-- `terraria_world_daytime`
-- `terraria_world_blood_moon`
-- `terraria_world_eclipse`
-- `terraria_world_hardmode`
-- `terraria_world_time`
-- `terraria_player_health{player=...}`
-- `terraria_player_mana{player=...}`
-- `terraria_player_deaths_total{player=...}`
-- `terraria_player_item_count{player=...,item=...}`
-- `terraria_monster_active{monster=...}`
-- `terraria_exporter_source_up` (1 quando API responde)
-
-## Pre-requisitos
-
-1. Docker Desktop com Kubernetes ativo
-2. `kubectl`, `terraform` e `helm` instalados
-3. Contexto `docker-desktop`
-4. PowerShell para scripts (`scripts/*.ps1`)
+- Grafana: `http://localhost:30030`
+- Prometheus: `http://localhost:30090`
+- Argo CD: `http://localhost:30080`
+- Terraria: `SEU_IP_LAN:30777`
 
 ## Configuracao
 
-Copie e edite:
+1. Copiar vars de exemplo:
 
 ```powershell
 Copy-Item terraform/terraform.tfvars.example terraform/terraform.tfvars
-notepad terraform/terraform.tfvars
 ```
 
-Campos importantes:
+2. Editar `terraform/terraform.tfvars` e preencher no minimo:
 
-- `terraria_image` (default: `ghcr.io/beardedio/terraria:tshock-latest`)
 - `world_file`
-- `terraria_api_url` (default interno: `http://terraria-service.terraria.svc.cluster.local:7878`)
-- `terraria_api_token` (se sua API exigir token)
-- `grafana_admin_user` / `grafana_admin_password`
+- `grafana_admin_password`
+
+3. Para features opcionais:
+
+- Discord alertas: `discord_webhook_url`
+- OAuth GitHub: `grafana_github_oauth_enabled=true` + `grafana_github_client_id` + `grafana_github_client_secret`
+- Gameplay API token (se TShock/API exigir): `terraria_api_token`
 
 ## Deploy
 
@@ -62,65 +51,50 @@ Campos importantes:
 ./scripts/deploy.ps1
 ```
 
-O script:
-- valida cluster
-- bootstrapa CRDs de monitoramento na primeira vez
-- aplica Terraform
-- garante mundo no PVC (cria automatico se faltar)
-
-## Upload de mapa
-
-Enviar arquivo próprio:
-
-```powershell
-./scripts/upload-world.ps1 -WorldFile "C:/caminho/seu_mapa.wld"
-```
-
-Ou apenas garantir/criar por nome:
-
-```powershell
-./scripts/upload-world.ps1 -WorldName "test.wld"
-```
-
-## Acesso
-
-- Terraria: `SEU_IP_LAN:30777`
-- Grafana: `http://localhost:30030`
-- Prometheus: `http://localhost:30090`
-
-Abra firewall (Admin):
+Depois liberar firewall (admin):
 
 ```powershell
 ./scripts/open-firewall.ps1
 ```
 
+## Mundo
+
+Enviar mapa:
+
+```powershell
+./scripts/upload-world.ps1 -WorldFile "C:/caminho/seu_mapa.wld"
+```
+
+Ou criar/garantir mundo por nome:
+
+```powershell
+./scripts/upload-world.ps1 -WorldName "test.wld"
+```
+
 ## Validacao rapida
 
 ```powershell
-kubectl get pods -n terraria
-kubectl get pods -n monitoring
+kubectl get pods -A
 kubectl get svc -n terraria
 kubectl get svc -n monitoring
+kubectl get svc -n argocd
 ```
 
-No Prometheus, teste:
+Prometheus queries uteis:
 
 ```promql
 terraria_exporter_source_up
 terraria_players_online
 terraria_monster_active
+probe_success{job="terraria-tcp-probe"}
 ```
 
-Se `terraria_exporter_source_up = 0`, a API de gameplay nao respondeu (URL/token/servidor).
+## Observacoes importantes
 
-## Dashboards
-
-No Grafana, confira:
-
-1. `Terraria K8s Overview`
-2. `Terraria Gameplay Overview`
-
-Se estiver vazio logo após subir, aguarde 1-3 minutos para scrape e recarregue.
+- Tudo esta focado em ambiente local.
+- Se o cluster for recriado no Docker Desktop, reaplique com `terraform apply`.
+- Se `terraria_exporter_source_up=0`, API de gameplay nao respondeu (URL/token/API do servidor).
+- O Argo CD sobe, mas voce ainda precisa cadastrar o repo/app nele para fluxo GitOps completo.
 
 ## Destroy
 

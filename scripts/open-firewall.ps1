@@ -1,7 +1,8 @@
 param(
   [int]$TerrariaPort = 30777,
   [int]$GrafanaPort = 30030,
-  [int]$PrometheusPort = 30090
+  [int]$PrometheusPort = 30090,
+  [int]$ArgoCdPort = 30080
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,7 +10,8 @@ $ErrorActionPreference = "Stop"
 $rules = @(
   @{ Name = "Terraria Server"; Port = $TerrariaPort },
   @{ Name = "Grafana"; Port = $GrafanaPort },
-  @{ Name = "Prometheus"; Port = $PrometheusPort }
+  @{ Name = "Prometheus"; Port = $PrometheusPort },
+  @{ Name = "ArgoCD"; Port = $ArgoCdPort }
 )
 
 foreach ($rule in $rules) {

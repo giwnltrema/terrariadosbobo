@@ -6,6 +6,29 @@ world_file                                = "test.wld"
 terraria_api_url                          = "http://terraria-service.terraria.svc.cluster.local:7878"
 terraria_api_token                        = ""
 terraria_exporter_scrape_interval_seconds = 15
+
+monitoring_storage_class                  = "hostpath"
+prometheus_persistence_size               = "20Gi"
+grafana_persistence_size                  = "5Gi"
+
+loki_enabled                              = true
+loki_persistence_size                     = "10Gi"
+
+argocd_enabled                            = true
+argocd_node_port                          = 30080
+
+discord_webhook_url                       = ""
+
+grafana_github_oauth_enabled              = false
+grafana_github_client_id                  = ""
+grafana_github_client_secret              = ""
+grafana_github_allowed_organizations      = []
+
+terraria_backup_enabled                   = true
+terraria_backup_schedule                  = "0 */6 * * *"
+terraria_backup_retention_count           = 20
+terraria_backup_pvc_size                  = "10Gi"
+
 terraria_node_port                        = 30777
 prometheus_node_port                      = 30090
 grafana_node_port                         = 30030

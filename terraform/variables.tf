@@ -22,6 +22,12 @@ variable "monitoring_namespace" {
   default     = "monitoring"
 }
 
+variable "argocd_namespace" {
+  description = "Namespace do Argo CD"
+  type        = string
+  default     = "argocd"
+}
+
 variable "terraria_image" {
   description = "Imagem do servidor Terraria"
   type        = string
@@ -51,6 +57,109 @@ variable "terraria_exporter_scrape_interval_seconds" {
   description = "Intervalo de coleta do exporter de gameplay"
   type        = number
   default     = 15
+}
+
+variable "monitoring_storage_class" {
+  description = "StorageClass para persistencia local"
+  type        = string
+  default     = "hostpath"
+}
+
+variable "prometheus_persistence_size" {
+  description = "Tamanho do volume persistente do Prometheus"
+  type        = string
+  default     = "20Gi"
+}
+
+variable "grafana_persistence_size" {
+  description = "Tamanho do volume persistente do Grafana"
+  type        = string
+  default     = "5Gi"
+}
+
+variable "loki_enabled" {
+  description = "Habilita stack Loki/Promtail"
+  type        = bool
+  default     = true
+}
+
+variable "loki_persistence_size" {
+  description = "Tamanho do volume persistente do Loki"
+  type        = string
+  default     = "10Gi"
+}
+
+variable "argocd_enabled" {
+  description = "Habilita Argo CD"
+  type        = bool
+  default     = true
+}
+
+variable "argocd_node_port" {
+  description = "NodePort HTTP do Argo CD"
+  type        = number
+  default     = 30080
+
+  validation {
+    condition     = var.argocd_node_port >= 30000 && var.argocd_node_port <= 32767
+    error_message = "argocd_node_port deve estar entre 30000 e 32767."
+  }
+}
+
+variable "discord_webhook_url" {
+  description = "Webhook do Discord para alertas do Alertmanager (vazio desativa envio)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "grafana_github_oauth_enabled" {
+  description = "Habilita login GitHub no Grafana"
+  type        = bool
+  default     = false
+}
+
+variable "grafana_github_client_id" {
+  description = "Client ID OAuth do GitHub para Grafana"
+  type        = string
+  default     = ""
+}
+
+variable "grafana_github_client_secret" {
+  description = "Client Secret OAuth do GitHub para Grafana"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "grafana_github_allowed_organizations" {
+  description = "Orgs do GitHub permitidas no login do Grafana (array vazio libera todas)"
+  type        = list(string)
+  default     = []
+}
+
+variable "terraria_backup_enabled" {
+  description = "Habilita job de backup do mundo para PVC local"
+  type        = bool
+  default     = true
+}
+
+variable "terraria_backup_schedule" {
+  description = "Cron schedule do backup do mundo"
+  type        = string
+  default     = "0 */6 * * *"
+}
+
+variable "terraria_backup_retention_count" {
+  description = "Quantidade maxima de arquivos de backup mantidos"
+  type        = number
+  default     = 20
+}
+
+variable "terraria_backup_pvc_size" {
+  description = "Tamanho do PVC de backup local do mundo"
+  type        = string
+  default     = "10Gi"
 }
 
 variable "terraria_node_port" {
