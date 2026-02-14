@@ -5,7 +5,7 @@ param(
   [string]$Deployment = "terraria-server",
   [string]$PvcName = "terraria-config",
   [string]$ManagerPodName = "world-manager",
-  [string]$ManagerImage = "ghcr.io/beardedio/terraria:tshock-latest",
+  [string]$ManagerImage = "ghcr.io/beardedio/terraria:latest",
   [switch]$AutoCreateIfMissing,
   [ValidateSet("small", "medium", "large")]
   [string]$WorldSize = "medium",
@@ -176,3 +176,4 @@ Invoke-Kubectl -Args @("scale", "deployment/$Deployment", "-n", $Namespace, "--r
 Invoke-Kubectl -Args @("rollout", "status", "deployment/$Deployment", "-n", $Namespace, "--timeout=300s") -ErrorMessage "Falha aguardando deployment ficar Ready" | Out-Null
 
 Write-Host "Mundo pronto: $WorldName"
+

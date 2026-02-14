@@ -159,21 +159,6 @@ locals {
       allowed_organizations = join(" ", local.grafana_github_allowed_orgs_trimmed)
     } : {}
   )
-
-  grafana_additional_datasources = var.loki_enabled ? [
-    {
-      name      = "Loki"
-      uid       = "loki"
-      type      = "loki"
-      access    = "proxy"
-      url       = "http://loki-stack.${var.monitoring_namespace}.svc.cluster.local:3100"
-      isDefault = false
-      editable  = true
-      jsonData = {
-        maxLines = 2000
-      }
-    }
-  ] : []
 }
 resource "helm_release" "kube_prometheus_stack" {
   name             = "kube-prom-stack"
@@ -258,10 +243,12 @@ resource "helm_release" "kube_prometheus_stack" {
             searchNamespace = var.monitoring_namespace
           }
           datasources = {
-            enabled = false
+            enabled                  = true
+            label                    = "grafana_datasource"
+            searchNamespace          = var.monitoring_namespace
+            defaultDatasourceEnabled = false
           }
         }
-        additionalDataSources = local.grafana_additional_datasources
         "grafana.ini" = {
           server = {
             root_url = "http://localhost:${var.grafana_node_port}"
@@ -853,14 +840,4 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
-
-
-
-
-
-
-
-
-
-
 

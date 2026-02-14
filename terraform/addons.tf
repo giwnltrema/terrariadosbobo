@@ -95,6 +95,35 @@ resource "kubernetes_config_map" "grafana_loki_datasource" {
     helm_release.loki_stack
   ]
 }
+resource "kubernetes_config_map" "grafana_prometheus_datasource" {
+  metadata {
+    name      = "grafana-prometheus-datasource"
+    namespace = kubernetes_namespace.monitoring.metadata[0].name
+    labels = {
+      grafana_datasource = "1"
+    }
+  }
+
+  data = {
+    "prometheus-datasource.yaml" = <<-EOT
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          uid: prometheus
+          type: prometheus
+          access: proxy
+          url: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc.cluster.local:9090
+          isDefault: true
+          editable: true
+          jsonData:
+            timeInterval: 30s
+    EOT
+  }
+
+  depends_on = [
+    helm_release.kube_prometheus_stack
+  ]
+}
 resource "kubernetes_config_map" "grafana_logs_dashboards" {
   count = var.loki_enabled ? 1 : 0
 
@@ -509,6 +538,4 @@ resource "kubernetes_manifest" "argocd_bootstrap_application" {
     kubernetes_secret.argocd_repository
   ]
 }
-
-
 

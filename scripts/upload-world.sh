@@ -7,7 +7,7 @@ NAMESPACE="terraria"
 DEPLOYMENT="terraria-server"
 PVC_NAME="terraria-config"
 MANAGER_POD_NAME="world-manager"
-MANAGER_IMAGE="ghcr.io/beardedio/terraria:tshock-latest"
+MANAGER_IMAGE="ghcr.io/beardedio/terraria:latest"
 AUTO_CREATE_IF_MISSING="true"
 WORLD_SIZE="medium"
 MAX_PLAYERS="8"
@@ -27,7 +27,7 @@ Options:
   --deployment NAME               (default: terraria-server)
   --pvc-name NAME                 (default: terraria-config)
   --manager-pod-name NAME         (default: world-manager)
-  --manager-image IMAGE           (default: ghcr.io/beardedio/terraria:tshock-latest)
+  --manager-image IMAGE           (default: ghcr.io/beardedio/terraria:latest)
   --no-auto-create                (do not create world if missing)
   --world-size small|medium|large (default: medium)
   --max-players N                 (default: 8)
@@ -216,3 +216,4 @@ kubectl scale "deployment/$DEPLOYMENT" -n "$NAMESPACE" --replicas=1 >/dev/null
 kubectl rollout status "deployment/$DEPLOYMENT" -n "$NAMESPACE" --timeout=300s >/dev/null
 
 echo "Mundo pronto: $WORLD_NAME"
+
