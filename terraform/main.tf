@@ -148,9 +148,8 @@ locals {
     {
       enabled                    = var.grafana_github_oauth_enabled
       allow_sign_up              = true
-      allow_assign_grafana_admin = true
-      role_attribute_path        = "'GrafanaAdmin'"
-      role_attribute_strict      = false
+      role_attribute_path   = "'Admin'"
+      role_attribute_strict = false
       client_id                  = var.grafana_github_client_id
       client_secret              = var.grafana_github_client_secret
       scopes                     = local.grafana_github_oauth_scopes
@@ -530,6 +529,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 1,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Terraria Pod CPU (cores)",
             "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"terraria\",pod=~\"terraria-server-.*\",container!=\"\"}[5m]))"}],
             "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
@@ -537,6 +537,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 2,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Terraria Pod Memory (bytes)",
             "targets": [{"expr": "sum(container_memory_working_set_bytes{namespace=\"terraria\",pod=~\"terraria-server-.*\",container!=\"\"})"}],
             "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
@@ -544,6 +545,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 3,
             "type": "stat",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Terraria TCP Reachability",
             "targets": [{"expr": "probe_success{job=\"terraria-tcp-probe\"}"}],
             "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8}
@@ -551,6 +553,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 4,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Terraria Pod Restarts",
             "targets": [{"expr": "sum(kube_pod_container_status_restarts_total{namespace=\"terraria\",pod=~\"terraria-server-.*\"})"}],
             "gridPos": {"h": 6, "w": 16, "x": 8, "y": 8}
@@ -574,6 +577,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 1,
             "type": "stat",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "API Source Up",
             "targets": [{"expr": "max(terraria_exporter_source_up)"}],
             "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0}
@@ -581,6 +585,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 2,
             "type": "stat",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "World Parser Up",
             "targets": [{"expr": "max(terraria_world_parser_up)"}],
             "gridPos": {"h": 4, "w": 3, "x": 3, "y": 0}
@@ -588,6 +593,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 3,
             "type": "stat",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Players Online",
             "targets": [{"expr": "max(terraria_players_online)"}],
             "gridPos": {"h": 4, "w": 3, "x": 6, "y": 0}
@@ -595,6 +601,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 4,
             "type": "stat",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Players Max",
             "targets": [{"expr": "max(terraria_players_max)"}],
             "gridPos": {"h": 4, "w": 3, "x": 9, "y": 0}
@@ -602,6 +609,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 5,
             "type": "stat",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Hardmode",
             "targets": [{"expr": "max(terraria_world_hardmode)"}],
             "gridPos": {"h": 4, "w": 3, "x": 12, "y": 0}
@@ -609,6 +617,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 6,
             "type": "stat",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Blood Moon",
             "targets": [{"expr": "max(terraria_world_blood_moon)"}],
             "gridPos": {"h": 4, "w": 3, "x": 15, "y": 0}
@@ -616,6 +625,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 7,
             "type": "stat",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Eclipse",
             "targets": [{"expr": "max(terraria_world_eclipse)"}],
             "gridPos": {"h": 4, "w": 3, "x": 18, "y": 0}
@@ -623,6 +633,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 8,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Players Online Over Time",
             "targets": [{"expr": "max(terraria_players_online)", "legendFormat": "Players"}],
             "gridPos": {"h": 8, "w": 8, "x": 0, "y": 4}
@@ -630,6 +641,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 9,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "World Time",
             "targets": [{"expr": "max(terraria_world_time)", "legendFormat": "World Time"}],
             "gridPos": {"h": 8, "w": 8, "x": 8, "y": 4}
@@ -637,6 +649,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 10,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "World Structures",
             "targets": [
               {"expr": "max(terraria_world_chests_total)", "legendFormat": "Chests"},
@@ -648,6 +661,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 11,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Player Health",
             "targets": [{"expr": "max by (player) (terraria_player_health)"}],
             "gridPos": {"h": 8, "w": 8, "x": 0, "y": 12}
@@ -655,6 +669,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 12,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Player Mana",
             "targets": [{"expr": "max by (player) (terraria_player_mana)"}],
             "gridPos": {"h": 8, "w": 8, "x": 8, "y": 12}
@@ -662,6 +677,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 13,
             "type": "timeseries",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Player Deaths Total",
             "targets": [{"expr": "max by (player) (terraria_player_deaths_total)"}],
             "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12}
@@ -669,6 +685,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 14,
             "type": "barchart",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Monsters Active by Type",
             "targets": [{"expr": "topk(20, sum by (monster) (terraria_monster_active))"}],
             "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
@@ -676,6 +693,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 15,
             "type": "table",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Player Items",
             "targets": [{"expr": "topk(100, sum by (player, item) (terraria_player_item_count))"}],
             "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
@@ -683,6 +701,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 16,
             "type": "table",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Chest Items (Top 100)",
             "targets": [{"expr": "topk(100, sum by (chest, item) (terraria_chest_item_count))"}],
             "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28}
@@ -690,6 +709,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 17,
             "type": "barchart",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Chest Items by Type (Top 30)",
             "targets": [{"expr": "topk(30, sum by (item) (terraria_chest_item_count_by_item))"}],
             "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28}
@@ -697,6 +717,7 @@ resource "kubernetes_config_map" "terraria_grafana_dashboards" {
           {
             "id": 18,
             "type": "table",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "title": "Housed NPCs",
             "targets": [{"expr": "sum by (npc) (terraria_world_housed_npc)"}],
             "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36}
@@ -846,6 +867,4 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
-
-
 
