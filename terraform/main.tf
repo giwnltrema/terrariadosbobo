@@ -142,7 +142,7 @@ locals {
     if trimspace(org) != ""
   ]
 
-  grafana_github_oauth_scopes = length(local.grafana_github_allowed_orgs_trimmed) > 0 ? "read:user,user:email,read:org" : "read:user,user:email"
+  grafana_github_oauth_scopes = "read:user,user:email,read:org"
 
   grafana_github_auth = merge(
     {
@@ -853,6 +853,7 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
 
 
 
