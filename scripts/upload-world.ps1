@@ -171,9 +171,26 @@ if (-not $worldExists) {
 Write-Host "Limpando pod auxiliar..."
 & kubectl delete pod $ManagerPodName -n $Namespace --ignore-not-found=true | Out-Null
 
+Write-Host "Configurando deployment $Deployment para usar mundo '$WorldName'..."
+Invoke-Kubectl -Args @("set", "env", "deployment/$Deployment", "-n", $Namespace, "world=$WorldName", "worldpath=/config") -ErrorMessage "Falha ao configurar env world/worldpath no deployment" | Out-Null
+
 Write-Host "Subindo deployment $Deployment com mundo '$WorldName'..."
 Invoke-Kubectl -Args @("scale", "deployment/$Deployment", "-n", $Namespace, "--replicas=1") -ErrorMessage "Falha ao escalar deployment para 1" | Out-Null
-Invoke-Kubectl -Args @("rollout", "status", "deployment/$Deployment", "-n", $Namespace, "--timeout=300s") -ErrorMessage "Falha aguardando deployment ficar Ready" | Out-Null
 
-Write-Host "Mundo pronto: $WorldName"
+$rolloutOk = $true
+try {
+  Invoke-Kubectl -Args @("rollout", "status", "deployment/$Deployment", "-n", $Namespace, "--timeout=300s") -ErrorMessage "Falha aguardando deployment ficar Ready" | Out-Null
+}
+catch {
+  $rolloutOk = $false
+  Write-Host "Rollout falhou para deployment/$Deployment. Diagnostico rapido:" -ForegroundColor Yellow
+  & kubectl get pods -n $Namespace -l app=terraria-server -o wide
+  & kubectl logs deployment/$Deployment -n $Namespace --tail=120
+  throw
+}
+
+if ($rolloutOk) {
+  Write-Host "Mundo pronto: $WorldName"
+}
+
 

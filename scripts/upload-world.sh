@@ -211,9 +211,19 @@ fi
 echo "Limpando pod auxiliar..."
 kubectl delete pod "$MANAGER_POD_NAME" -n "$NAMESPACE" --ignore-not-found >/dev/null
 
+echo "Configurando deployment $DEPLOYMENT para usar mundo '$WORLD_NAME'..."
+kubectl set env "deployment/$DEPLOYMENT" -n "$NAMESPACE" "world=$WORLD_NAME" "worldpath=/config" >/dev/null
+
 echo "Subindo deployment $DEPLOYMENT com mundo '$WORLD_NAME'..."
 kubectl scale "deployment/$DEPLOYMENT" -n "$NAMESPACE" --replicas=1 >/dev/null
-kubectl rollout status "deployment/$DEPLOYMENT" -n "$NAMESPACE" --timeout=300s >/dev/null
+
+if ! kubectl rollout status "deployment/$DEPLOYMENT" -n "$NAMESPACE" --timeout=300s; then
+  echo "Rollout falhou para deployment/$DEPLOYMENT. Diagnostico rapido:" >&2
+  kubectl get pods -n "$NAMESPACE" -l app=terraria-server -o wide >&2 || true
+  kubectl logs "deployment/$DEPLOYMENT" -n "$NAMESPACE" --tail=120 >&2 || true
+  exit 1
+fi
 
 echo "Mundo pronto: $WORLD_NAME"
+
 
