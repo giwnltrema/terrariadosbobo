@@ -136,6 +136,45 @@ resource "kubernetes_service" "terraria" {
   }
 }
 
+locals {
+  grafana_github_allowed_orgs_trimmed = [
+    for org in var.grafana_github_allowed_organizations : trimspace(org)
+    if trimspace(org) != ""
+  ]
+
+  grafana_github_oauth_scopes = length(local.grafana_github_allowed_orgs_trimmed) > 0 ? "read:user,user:email,read:org" : "read:user,user:email"
+
+  grafana_github_auth = merge(
+    {
+      enabled       = var.grafana_github_oauth_enabled
+      allow_sign_up = true
+      client_id     = var.grafana_github_client_id
+      client_secret = var.grafana_github_client_secret
+      scopes        = local.grafana_github_oauth_scopes
+      auth_url      = "https://github.com/login/oauth/authorize"
+      token_url     = "https://github.com/login/oauth/access_token"
+      api_url       = "https://api.github.com/user"
+    },
+    length(local.grafana_github_allowed_orgs_trimmed) > 0 ? {
+      allowed_organizations = join(" ", local.grafana_github_allowed_orgs_trimmed)
+    } : {}
+  )
+
+  grafana_additional_datasources = var.loki_enabled ? [
+    {
+      name      = "Loki"
+      uid       = "loki"
+      type      = "loki"
+      access    = "proxy"
+      url       = "http://loki-stack.${var.monitoring_namespace}.svc.cluster.local:3100"
+      isDefault = false
+      editable  = true
+      jsonData = {
+        maxLines = 2000
+      }
+    }
+  ] : []
+}
 resource "helm_release" "kube_prometheus_stack" {
   name             = "kube-prom-stack"
   repository       = "https://prometheus-community.github.io/helm-charts"
@@ -219,10 +258,10 @@ resource "helm_release" "kube_prometheus_stack" {
             searchNamespace = var.monitoring_namespace
           }
           datasources = {
-            enabled         = true
-            searchNamespace = var.monitoring_namespace
+            enabled = false
           }
         }
+        additionalDataSources = local.grafana_additional_datasources
         "grafana.ini" = {
           server = {
             root_url = "http://localhost:${var.grafana_node_port}"
@@ -230,17 +269,7 @@ resource "helm_release" "kube_prometheus_stack" {
           auth = {
             disable_login_form = var.grafana_github_oauth_enabled
           }
-          "auth.github" = {
-            enabled               = var.grafana_github_oauth_enabled
-            allow_sign_up         = true
-            client_id             = var.grafana_github_client_id
-            client_secret         = var.grafana_github_client_secret
-            scopes                = "read:user,user:email,read:org"
-            auth_url              = "https://github.com/login/oauth/authorize"
-            token_url             = "https://github.com/login/oauth/access_token"
-            api_url               = "https://api.github.com/user"
-            allowed_organizations = join(" ", var.grafana_github_allowed_organizations)
-          }
+          "auth.github" = local.grafana_github_auth
         }
       }
       kubeStateMetrics = {
@@ -824,6 +853,7 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
 
 
 
