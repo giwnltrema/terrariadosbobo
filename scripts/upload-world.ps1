@@ -21,6 +21,20 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Invoke-Kubectl {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$Args,
+    [string]$ErrorMessage = "Falha ao executar kubectl"
+  )
+
+  $output = & kubectl @Args
+  if ($LASTEXITCODE -ne 0) {
+    throw "$ErrorMessage (exit code: $LASTEXITCODE)"
+  }
+  return $output
+}
+
 if (-not $AutoCreateIfMissing.IsPresent) {
   $AutoCreateIfMissing = $true
 }
@@ -45,15 +59,15 @@ $worldBaseName = [System.IO.Path]::GetFileNameWithoutExtension($WorldName)
 $worldSizeNumber = @{ small = 1; medium = 2; large = 3 }[$WorldSize]
 $difficultyNumber = @{ classic = 0; expert = 1; master = 2; journey = 3 }[$Difficulty]
 
-$safeSeed = $Seed.Replace('\', '\\').Replace('"', '\"')
-$safeExtraCreateArgs = $ExtraCreateArgs.Replace('\', '\\').Replace('"', '\"')
+$safeSeed = $Seed.Replace('\\', '\\\\').Replace('"', '\\"')
+$safeExtraCreateArgs = $ExtraCreateArgs.Replace('\\', '\\\\').Replace('"', '\\"')
 
 Write-Host "Escalando $Deployment para 0 replicas para manipular o volume..."
-kubectl scale deployment/$Deployment -n $Namespace --replicas=0 | Out-Null
-kubectl rollout status deployment/$Deployment -n $Namespace --timeout=180s | Out-Null
+Invoke-Kubectl -Args @("scale", "deployment/$Deployment", "-n", $Namespace, "--replicas=0") -ErrorMessage "Falha ao escalar deployment para 0" | Out-Null
+Invoke-Kubectl -Args @("rollout", "status", "deployment/$Deployment", "-n", $Namespace, "--timeout=180s") -ErrorMessage "Falha aguardando deployment em 0 replicas" | Out-Null
 
 Write-Host "Subindo pod auxiliar '$ManagerPodName' montando PVC '$PvcName'..."
-kubectl delete pod $ManagerPodName -n $Namespace --ignore-not-found=true | Out-Null
+& kubectl delete pod $ManagerPodName -n $Namespace --ignore-not-found=true | Out-Null
 
 $manifest = @"
 apiVersion: v1
@@ -77,10 +91,14 @@ spec:
 "@
 
 $manifest | kubectl apply -f - | Out-Null
-kubectl wait --for=condition=Ready pod/$ManagerPodName -n $Namespace --timeout=180s | Out-Null
+if ($LASTEXITCODE -ne 0) {
+  throw "Falha ao criar pod auxiliar '$ManagerPodName'"
+}
 
-$existsOutput = kubectl exec -n $Namespace $ManagerPodName -- sh -lc "if [ -f '/config/$WorldName' ]; then echo exists; else echo missing; fi" 2>$null
-if (-not $existsOutput) {
+Invoke-Kubectl -Args @("wait", "--for=condition=Ready", "pod/$ManagerPodName", "-n", $Namespace, "--timeout=180s") -ErrorMessage "Pod auxiliar nao ficou Ready" | Out-Null
+
+$existsOutput = & kubectl exec -n $Namespace $ManagerPodName -- sh -lc "if [ -f '/config/$WorldName' ]; then echo exists; else echo missing; fi" 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $existsOutput) {
   throw "Falha ao verificar se o mundo existe no PVC."
 }
 
@@ -88,51 +106,47 @@ $worldExists = ($existsOutput.Trim() -eq "exists")
 
 if ($WorldFile) {
   Write-Host "Copiando arquivo '$WorldName' para o PVC..."
-  kubectl cp $WorldFile "${Namespace}/${ManagerPodName}:/config/$WorldName" | Out-Null
+  Invoke-Kubectl -Args @("cp", $WorldFile, "${Namespace}/${ManagerPodName}:/config/$WorldName") -ErrorMessage "Falha ao copiar arquivo de mundo" | Out-Null
   $worldExists = $true
 }
 elseif (-not $worldExists -and $AutoCreateIfMissing) {
   Write-Host "Mundo '$WorldName' nao existe. Criando automaticamente (size=$WorldSize, difficulty=$Difficulty, maxplayers=$MaxPlayers)..."
 
-  $createCmd = @"
-WORLD_PATH=\"/config/__WORLD_FILE__\"
-WORLD_NAME=\"__WORLD_BASE__\"
-WORLD_SIZE=\"__WORLD_SIZE__\"
-WORLD_DIFFICULTY=\"__WORLD_DIFFICULTY__\"
-MAX_PLAYERS=\"__MAX_PLAYERS__\"
-SERVER_PORT=\"__SERVER_PORT__\"
-WORLD_SEED=\"__WORLD_SEED__\"
-EXTRA_CREATE_ARGS=\"__EXTRA_CREATE_ARGS__\"
-
-CMD=\"./TerrariaServer -x64 -autocreate `$WORLD_SIZE -world \\\"`$WORLD_PATH\\\" -worldname \\\"`$WORLD_NAME\\\" -difficulty `$WORLD_DIFFICULTY -maxplayers `$MAX_PLAYERS -port `$SERVER_PORT\"
-if [ -n \"`$WORLD_SEED\" ]; then
-  CMD=\"`$CMD -seed \\\"`$WORLD_SEED\\\"\"
-fi
-if [ -n \"`$EXTRA_CREATE_ARGS\" ]; then
-  CMD=\"`$CMD `$EXTRA_CREATE_ARGS\"
-fi
-
-eval \"`$CMD >/tmp/worldgen.log 2>&1 &\"
-pid=`$!
-
-i=0
-while [ `$i -lt 120 ]; do
-  if [ -f \"`$WORLD_PATH\" ]; then
-    break
-  fi
-  i=`$((i+1))
-  sleep 2
-done
-
-kill `$pid >/dev/null 2>&1 || true
-wait `$pid >/dev/null 2>&1 || true
-
-if [ ! -f \"`$WORLD_PATH\" ]; then
-  echo \"Falha ao criar mundo automaticamente\" >&2
-  cat /tmp/worldgen.log >&2 || true
-  exit 1
-fi
-"@
+  $createCmd = @(
+    'WORLD_PATH="/config/__WORLD_FILE__"',
+    'WORLD_NAME="__WORLD_BASE__"',
+    'WORLD_SIZE="__WORLD_SIZE__"',
+    'WORLD_DIFFICULTY="__WORLD_DIFFICULTY__"',
+    'MAX_PLAYERS="__MAX_PLAYERS__"',
+    'SERVER_PORT="__SERVER_PORT__"',
+    'WORLD_SEED="__WORLD_SEED__"',
+    'EXTRA_CREATE_ARGS="__EXTRA_CREATE_ARGS__"',
+    '',
+    'if [ -n "$WORLD_SEED" ]; then',
+    '  ./TerrariaServer -x64 -autocreate "$WORLD_SIZE" -world "$WORLD_PATH" -worldname "$WORLD_NAME" -difficulty "$WORLD_DIFFICULTY" -maxplayers "$MAX_PLAYERS" -port "$SERVER_PORT" -seed "$WORLD_SEED" $EXTRA_CREATE_ARGS >/tmp/worldgen.log 2>&1 &',
+    'else',
+    '  ./TerrariaServer -x64 -autocreate "$WORLD_SIZE" -world "$WORLD_PATH" -worldname "$WORLD_NAME" -difficulty "$WORLD_DIFFICULTY" -maxplayers "$MAX_PLAYERS" -port "$SERVER_PORT" $EXTRA_CREATE_ARGS >/tmp/worldgen.log 2>&1 &',
+    'fi',
+    'pid=$!',
+    '',
+    'i=0',
+    'while [ $i -lt 120 ]; do',
+    '  if [ -f "$WORLD_PATH" ]; then',
+    '    break',
+    '  fi',
+    '  i=$((i+1))',
+    '  sleep 2',
+    'done',
+    '',
+    'kill $pid >/dev/null 2>&1 || true',
+    'wait $pid >/dev/null 2>&1 || true',
+    '',
+    'if [ ! -f "$WORLD_PATH" ]; then',
+    '  echo "Falha ao criar mundo automaticamente" >&2',
+    '  cat /tmp/worldgen.log >&2 || true',
+    '  exit 1',
+    'fi'
+  ) -join "`n"
 
   $createCmd = $createCmd.Replace("__WORLD_FILE__", $WorldName)
   $createCmd = $createCmd.Replace("__WORLD_BASE__", $worldBaseName)
@@ -143,7 +157,10 @@ fi
   $createCmd = $createCmd.Replace("__WORLD_SEED__", $safeSeed)
   $createCmd = $createCmd.Replace("__EXTRA_CREATE_ARGS__", $safeExtraCreateArgs)
 
-  kubectl exec -n $Namespace $ManagerPodName -- sh -lc $createCmd | Out-Null
+  & kubectl exec -n $Namespace $ManagerPodName -- sh -lc $createCmd | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "Falha na criacao automatica do mundo '$WorldName'."
+  }
   $worldExists = $true
 }
 
@@ -152,10 +169,10 @@ if (-not $worldExists) {
 }
 
 Write-Host "Limpando pod auxiliar..."
-kubectl delete pod $ManagerPodName -n $Namespace --ignore-not-found=true | Out-Null
+& kubectl delete pod $ManagerPodName -n $Namespace --ignore-not-found=true | Out-Null
 
 Write-Host "Subindo deployment $Deployment com mundo '$WorldName'..."
-kubectl scale deployment/$Deployment -n $Namespace --replicas=1 | Out-Null
-kubectl rollout status deployment/$Deployment -n $Namespace --timeout=300s | Out-Null
+Invoke-Kubectl -Args @("scale", "deployment/$Deployment", "-n", $Namespace, "--replicas=1") -ErrorMessage "Falha ao escalar deployment para 1" | Out-Null
+Invoke-Kubectl -Args @("rollout", "status", "deployment/$Deployment", "-n", $Namespace, "--timeout=300s") -ErrorMessage "Falha aguardando deployment ficar Ready" | Out-Null
 
 Write-Host "Mundo pronto: $WorldName"
