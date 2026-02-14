@@ -5,6 +5,7 @@ param(
   [string]$Deployment = "terraria-server",
   [string]$PvcName = "terraria-config",
   [string]$ManagerPodName = "world-manager",
+  [string]$ManagerImage = "ghcr.io/beardedio/terraria:tshock-latest",
   [switch]$AutoCreateIfMissing
 )
 
@@ -39,38 +40,35 @@ kubectl rollout status deployment/$Deployment -n $Namespace --timeout=180s | Out
 Write-Host "Subindo pod auxiliar '$ManagerPodName' montando PVC '$PvcName'..."
 kubectl delete pod $ManagerPodName -n $Namespace --ignore-not-found=true | Out-Null
 
-$overrides = @"
-{
-  "spec": {
-    "containers": [
-      {
-        "name": "world-manager",
-        "image": "beardedio/terraria:latest",
-        "command": ["sh", "-c", "sleep 3600"],
-        "volumeMounts": [
-          {
-            "name": "terraria-config",
-            "mountPath": "/config"
-          }
-        ]
-      }
-    ],
-    "volumes": [
-      {
-        "name": "terraria-config",
-        "persistentVolumeClaim": {
-          "claimName": "$PvcName"
-        }
-      }
-    ]
-  }
-}
+$manifest = @"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $ManagerPodName
+  namespace: $Namespace
+spec:
+  restartPolicy: Never
+  containers:
+    - name: world-manager
+      image: $ManagerImage
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: terraria-config
+          mountPath: /config
+  volumes:
+    - name: terraria-config
+      persistentVolumeClaim:
+        claimName: $PvcName
 "@
 
-kubectl run $ManagerPodName -n $Namespace --image=beardedio/terraria:latest --restart=Never --overrides=$overrides | Out-Null
+$manifest | kubectl apply -f - | Out-Null
 kubectl wait --for=condition=Ready pod/$ManagerPodName -n $Namespace --timeout=180s | Out-Null
 
-$existsOutput = kubectl exec -n $Namespace $ManagerPodName -- sh -lc "if [ -f '/config/$WorldName' ]; then echo exists; else echo missing; fi"
+$existsOutput = kubectl exec -n $Namespace $ManagerPodName -- sh -lc "if [ -f '/config/$WorldName' ]; then echo exists; else echo missing; fi" 2>$null
+if (-not $existsOutput) {
+  throw "Falha ao verificar se o mundo existe no PVC."
+}
+
 $worldExists = ($existsOutput.Trim() -eq "exists")
 
 if ($WorldFile) {
