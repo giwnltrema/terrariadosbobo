@@ -26,6 +26,7 @@ Production-style local stack for a Terraria server with observability, backups, 
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
 - [Access URLs](#access-urls)
+- [Screenshots](#screenshots)
 - [World management](#world-management)
 - [Observability](#observability)
 - [Argo CD](#argo-cd)
@@ -160,6 +161,24 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 | Argo CD | `http://localhost:30080` |
 | Terraria server | `YOUR_LAN_IP:30777` |
 
+## Screenshots
+
+> Visual gallery is sourced from `docs/screenshots/`. Replace placeholders with real screenshots from your environment.
+
+| Grafana K8s | Grafana Gameplay |
+|---|---|
+| ![Grafana K8s Overview](docs/screenshots/grafana-k8s-overview.svg) | ![Grafana Gameplay Overview](docs/screenshots/grafana-gameplay-overview.svg) |
+
+| Grafana Logs | Argo CD Applications |
+|---|---|
+| ![Grafana Logs Overview](docs/screenshots/grafana-logs-overview.svg) | ![Argo CD Applications](docs/screenshots/argocd-applications.svg) |
+
+| Argo CD Details |
+|---|
+| ![Argo CD Application Details](docs/screenshots/argocd-application-details.svg) |
+
+Capture guide: `docs/screenshots/README.md`
+
 ## World management
 
 Upload existing map:
@@ -286,4 +305,8 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
+
+
+
+
 

@@ -26,6 +26,7 @@ Stack local estilo producao para servidor de Terraria com observabilidade, backu
 - [Requisitos](#requisitos)
 - [Inicio rapido](#inicio-rapido)
 - [URLs de acesso](#urls-de-acesso)
+- [Screenshots](#screenshots)
 - [Gerenciamento de mundo](#gerenciamento-de-mundo)
 - [Observabilidade](#observabilidade)
 - [Argo CD](#argo-cd)
@@ -160,6 +161,24 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 | Argo CD | `http://localhost:30080` |
 | Servidor Terraria | `SEU_IP_LAN:30777` |
 
+## Screenshots
+
+> A galeria visual usa arquivos de `docs/screenshots/`. Substitua os placeholders por capturas reais do seu ambiente.
+
+| Grafana K8s | Grafana Gameplay |
+|---|---|
+| ![Grafana K8s Overview](docs/screenshots/grafana-k8s-overview.svg) | ![Grafana Gameplay Overview](docs/screenshots/grafana-gameplay-overview.svg) |
+
+| Grafana Logs | Argo CD Applications |
+|---|---|
+| ![Grafana Logs Overview](docs/screenshots/grafana-logs-overview.svg) | ![Argo CD Applications](docs/screenshots/argocd-applications.svg) |
+
+| Argo CD Details |
+|---|
+| ![Argo CD Application Details](docs/screenshots/argocd-application-details.svg) |
+
+Guia de captura: `docs/screenshots/README.md`
+
 ## Gerenciamento de mundo
 
 Upload de mapa existente:
@@ -286,4 +305,8 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
+
+
+
+
 
