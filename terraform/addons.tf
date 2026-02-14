@@ -155,7 +155,7 @@ resource "kubernetes_cron_job_v1" "terraria_world_backup" {
               image = "alpine:3.20"
               command = ["sh", "-c"]
               args = [
-                "set -eu; ts=$(date +%Y%m%d-%H%M%S); tar -czf /backups/world-${ts}.tar.gz -C /config .; ls -1t /backups/world-*.tar.gz | tail -n +$(( ${RETENTION_COUNT} + 1 )) | xargs -r rm -f"
+                "set -eu; ts=$(date +%Y%m%d-%H%M%S); tar -czf /backups/world-$${ts}.tar.gz -C /config .; ls -1t /backups/world-*.tar.gz | tail -n +$(( $${RETENTION_COUNT} + 1 )) | xargs -r rm -f"
               ]
 
               env {
@@ -254,3 +254,4 @@ resource "kubernetes_manifest" "terraria_alert_rules" {
     kubernetes_manifest.terraria_exporter_service_monitor
   ]
 }
+

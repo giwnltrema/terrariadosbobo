@@ -162,9 +162,9 @@ resource "helm_release" "kube_prometheus_stack" {
             }
           }
         }
-        config = var.discord_webhook_url != "" ? {
+        config = {
           route = {
-            receiver        = "discord"
+            receiver        = var.discord_webhook_url != "" ? "discord" : "null"
             group_by        = ["alertname"]
             group_wait      = "30s"
             group_interval  = "5m"
@@ -175,19 +175,14 @@ resource "helm_release" "kube_prometheus_stack" {
               name = "discord"
               webhook_configs = [
                 {
-                  url           = var.discord_webhook_url
+                  url           = var.discord_webhook_url != "" ? var.discord_webhook_url : "http://127.0.0.1:65535"
                   send_resolved = true
                 }
               ]
-            }
-          ]
-        } : {
-          route = {
-            receiver = "null"
-          }
-          receivers = [
+            },
             {
-              name = "null"
+              name            = "null"
+              webhook_configs = []
             }
           ]
         }
@@ -979,4 +974,5 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
 
