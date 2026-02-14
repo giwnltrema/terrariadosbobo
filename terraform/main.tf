@@ -28,6 +28,7 @@ resource "kubernetes_persistent_volume_claim" "terraria_config" {
 }
 
 resource "kubernetes_deployment" "terraria" {
+  wait_for_rollout = false
   metadata {
     name      = "terraria-server"
     namespace = kubernetes_namespace.terraria.metadata[0].name
@@ -978,3 +979,4 @@ resource "kubernetes_manifest" "terraria_tcp_probe" {
     kubernetes_service.terraria
   ]
 }
+
