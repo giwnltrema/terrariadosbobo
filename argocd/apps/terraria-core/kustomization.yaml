@@ -4,7 +4,9 @@ resources:
   - namespace.yaml
   - pvc-terraria-config.yaml
   - pvc-terraria-backups.yaml
+  - pvc-terraria-tailscale-state.yaml
   - deployment-terraria-server.yaml
+  - deployment-terraria-tailscale.yaml
   - service-terraria-server.yaml
   - secret-terraria-api.yaml
   - serviceaccount-terraria-exporter.yaml

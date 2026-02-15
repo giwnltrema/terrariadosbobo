@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terraria-tailscale
+  namespace: terraria
+  labels:
+    app: terraria-tailscale
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terraria-tailscale
+  template:
+    metadata:
+      labels:
+        app: terraria-tailscale
+    spec:
+      # This pod creates a Tailscale node inside the cluster and forwards raw TCP
+      # traffic from tailnet:7777 to the in-cluster service terraria-service:7777.
+      #
+      # It requires an auth key provided via secret `terraria-tailscale-auth`.
+      # Example:
+      #   kubectl -n terraria create secret generic terraria-tailscale-auth \
+      #     --from-literal=TS_AUTHKEY=tskey-auth-... \
+      #     --from-literal=TS_HOSTNAME=terrariadosbobo-terraria
+      containers:
+        - name: tailscale
+          image: ghcr.io/tailscale/tailscale:v1.94.2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: terraria-tailscale-auth
+                optional: true
+          env:
+            - name: TS_HOSTNAME
+              value: terrariadosbobo-terraria
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/tailscale
+            - name: run
+              mountPath: /var/run/tailscale
+            - name: dev-net-tun
+              mountPath: /dev/net/tun
+          command:
+            - /bin/sh
+            - -lc
+          args:
+            - |
+              set -eu
+
+              if [ -z "${TS_AUTHKEY:-}" ]; then
+                echo "[terraria-tailscale] TS_AUTHKEY is not set (secret terraria-tailscale-auth)."
+                echo "[terraria-tailscale] Pod will stay idle; create the secret and restart this deployment."
+                sleep 3600
+              fi
+
+              echo "[terraria-tailscale] starting tailscaled..."
+              tailscaled \
+                --state=/var/lib/tailscale/tailscaled.state \
+                --socket=/var/run/tailscale/tailscaled.sock &
+
+              # Wait for daemon socket
+              i=0
+              until tailscale --socket=/var/run/tailscale/tailscaled.sock status >/dev/null 2>&1; do
+                i=$((i+1))
+                if [ "$i" -gt 60 ]; then
+                  echo "[terraria-tailscale] tailscaled did not become ready in time"
+                  exit 1
+                fi
+                sleep 1
+              done
+
+              echo "[terraria-tailscale] bringing node up..."
+              tailscale --socket=/var/run/tailscale/tailscaled.sock up \
+                --authkey="${TS_AUTHKEY}" \
+                --hostname="${TS_HOSTNAME}" \
+                --accept-dns=false \
+                --reset \
+                --yes
+
+              echo "[terraria-tailscale] tailnet IPv4: $(tailscale --socket=/var/run/tailscale/tailscaled.sock ip -4)"
+              echo "[terraria-tailscale] forwarding TCP 7777 -> terraria-service.terraria.svc.cluster.local:7777"
+
+              # Keep serve in foreground so the container stays healthy.
+              tailscale --socket=/var/run/tailscale/tailscaled.sock serve \
+                --tcp=7777 terraria-service.terraria.svc.cluster.local:7777
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: terraria-tailscale-state
+        - name: run
+          emptyDir: {}
+        - name: dev-net-tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
