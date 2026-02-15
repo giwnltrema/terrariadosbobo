@@ -40,6 +40,7 @@ resource "helm_release" "loki_stack" {
           size             = var.loki_persistence_size
         }
       }
+      isDefault = false
       promtail = {
         enabled = true
       }
