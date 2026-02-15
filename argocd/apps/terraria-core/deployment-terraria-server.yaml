@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: terraria
-          image: ghcr.io/beardedio/terraria:tshock-latest
+          image: ghcr.io/beardedio/terraria:latest
           imagePullPolicy: IfNotPresent
           stdin: true
           tty: true
