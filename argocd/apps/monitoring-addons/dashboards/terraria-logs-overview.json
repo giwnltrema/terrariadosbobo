@@ -17,8 +17,9 @@
         "query": { "query": "label_values(namespace)", "refId": "LokiNamespaceVar" },
         "refresh": 1,
         "includeAll": true,
+        "allValue": ".*",
         "multi": true,
-        "current": { "selected": true, "text": "All", "value": "$__all" }
+        "current": { "selected": true, "text": "All", "value": ".*" }
       },
       {
         "name": "pod",
@@ -28,8 +29,9 @@
         "query": { "query": "label_values({namespace=~\"$namespace\"}, pod)", "refId": "LokiPodVar" },
         "refresh": 2,
         "includeAll": true,
+        "allValue": ".*",
         "multi": true,
-        "current": { "selected": true, "text": "All", "value": "$__all" }
+        "current": { "selected": true, "text": "All", "value": ".*" }
       }
     ]
   },
@@ -40,7 +42,7 @@
       "title": "Filtered Logs",
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
-        { "refId": "A", "expr": "{namespace=~\"$namespace\", pod=~\"$pod\"}", "queryType": "range" }
+        { "refId": "A", "expr": "{namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\"}", "queryType": "range" }
       ],
       "gridPos": { "h": 16, "w": 24, "x": 0, "y": 0 }
     }
