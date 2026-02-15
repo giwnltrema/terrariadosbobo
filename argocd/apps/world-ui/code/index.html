@@ -6,182 +6,185 @@
   <title>Terraria World Console</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="sky"></div>
-  <div class="fog"></div>
-  <div class="mountains"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
+  <div class="bg-noise" aria-hidden="true"></div>
 
   <main class="app-shell">
     <header class="hero">
-      <h1>TERRARIA WORLD CONSOLE</h1>
-      <p>Create worlds, monitor runtime, and operate your server</p>
+      <div class="hero-badge">Terrariadosbobo</div>
+      <h1>Terraria World Console</h1>
+      <p>World management, uploads, and runtime ops for your local Kubernetes stack.</p>
     </header>
 
-    <section class="window window-world">
-      <div class="window-title">World Builder</div>
+    <div class="panels">
+      <section class="window window-world">
+        <div class="window-title">World</div>
 
-      <div class="row two">
-        <label class="field">
-          <span>World Name (.wld)</span>
-          <input id="worldName" type="text" value="test.wld" placeholder="my_world.wld">
-        </label>
-        <label class="field">
-          <span>Manual Seed (optional)</span>
-          <input id="manualSeed" type="text" placeholder="leave empty for random">
-        </label>
-      </div>
+        <div class="row two">
+          <label class="field">
+            <span>World Name (.wld)</span>
+            <input id="worldName" type="text" value="test.wld" placeholder="my_world.wld">
+          </label>
+          <label class="field">
+            <span>Manual Seed (optional)</span>
+            <input id="manualSeed" type="text" placeholder="leave empty for random">
+          </label>
+        </div>
 
-      <div class="row two">
-        <div class="field">
-          <span>World Size</span>
-          <div class="choice-grid" id="sizeChoices">
-            <button data-value="small">Small</button>
-            <button data-value="medium" class="active">Medium</button>
-            <button data-value="large">Large</button>
+        <div class="row two">
+          <div class="field">
+            <span>World Size</span>
+            <div class="choice-grid" id="sizeChoices">
+              <button data-value="small">Small</button>
+              <button data-value="medium" class="active">Medium</button>
+              <button data-value="large">Large</button>
+            </div>
+          </div>
+          <div class="field">
+            <span>Difficulty</span>
+            <div class="choice-grid" id="difficultyChoices">
+              <button data-value="journey">Journey</button>
+              <button data-value="classic" class="active">Classic</button>
+              <button data-value="expert">Expert</button>
+              <button data-value="master">Master</button>
+            </div>
           </div>
         </div>
-        <div class="field">
-          <span>Difficulty</span>
-          <div class="choice-grid" id="difficultyChoices">
-            <button data-value="journey">Journey</button>
-            <button data-value="classic" class="active">Classic</button>
-            <button data-value="expert">Expert</button>
-            <button data-value="master">Master</button>
+
+        <div class="row two">
+          <div class="field">
+            <span>World Evil</span>
+            <div class="choice-grid" id="evilChoices">
+              <button data-value="random" class="active">Random</button>
+              <button data-value="corruption">Corruption</button>
+              <button data-value="crimson">Crimson</button>
+            </div>
+          </div>
+          <div class="field">
+            <span>Special Seeds</span>
+            <div class="seed-actions">
+              <button id="openSeedModal" class="secondary">Seed Library</button>
+              <button id="clearSeeds" class="ghost">Clear</button>
+            </div>
+            <p id="selectedSeedsLabel" class="seed-summary">No special seeds selected</p>
           </div>
         </div>
-      </div>
 
-      <div class="row two">
-        <div class="field">
-          <span>World Evil</span>
-          <div class="choice-grid" id="evilChoices">
-            <button data-value="random" class="active">Random</button>
-            <button data-value="corruption">Corruption</button>
-            <button data-value="crimson">Crimson</button>
+        <div class="row two">
+          <label class="field">
+            <span>Max Players</span>
+            <input id="maxPlayers" type="number" min="1" max="255" value="8">
+          </label>
+          <label class="field">
+            <span>Server Port</span>
+            <input id="serverPort" type="number" min="1" max="65535" value="7777">
+          </label>
+        </div>
+
+        <div class="row one">
+          <label class="field">
+            <span>Extra create args (optional)</span>
+            <input id="extraArgs" type="text" placeholder="example: -npcstream">
+          </label>
+        </div>
+
+        <div class="row two">
+          <label class="field">
+            <span>Upload existing .wld</span>
+            <input id="worldFile" type="file" accept=".wld">
+          </label>
+          <div class="field">
+            <span>Upload flow</span>
+            <p class="seed-summary">Copies file to PVC, sets active world, and rolls deployment.</p>
           </div>
         </div>
-        <div class="field">
-          <span>Special Seeds</span>
-          <div class="seed-actions">
-            <button id="openSeedModal" class="secondary">Seed Library</button>
-            <button id="clearSeeds" class="ghost">Clear</button>
+
+        <div class="upload-panel" aria-live="polite">
+          <div class="upload-header">
+            <strong>Upload Status</strong>
+            <span id="uploadStatus" class="status-chip idle">idle</span>
           </div>
-          <p id="selectedSeedsLabel" class="seed-summary">No special seeds selected</p>
-        </div>
-      </div>
 
-      <div class="row two">
-        <label class="field">
-          <span>Max Players</span>
-          <input id="maxPlayers" type="number" min="1" max="255" value="8">
-        </label>
-        <label class="field">
-          <span>Server Port</span>
-          <input id="serverPort" type="number" min="1" max="65535" value="7777">
-        </label>
-      </div>
+          <div class="progress-shell" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="uploadProgressFill" class="progress-fill" style="width:0%"></div>
+          </div>
+          <div class="progress-meta">
+            <span id="uploadProgressLabel" class="muted">0%</span>
+            <span id="uploadBytesLabel" class="muted">-</span>
+          </div>
 
-      <div class="row one">
-        <label class="field">
-          <span>Extra create args (optional)</span>
-          <input id="extraArgs" type="text" placeholder="example: -npcstream">
-        </label>
-      </div>
-
-      <div class="row two">
-        <label class="field">
-          <span>Upload existing .wld</span>
-          <input id="worldFile" type="file" accept=".wld">
-        </label>
-        <div class="field">
-          <span>Upload flow</span>
-          <p class="seed-summary">Copies file to PVC, sets active world, and rolls deployment.</p>
-        </div>
-      </div>
-
-      <div class="upload-panel" aria-live="polite">
-        <div class="upload-header">
-          <strong>Upload Status</strong>
-          <span id="uploadStatus" class="status-chip idle">idle</span>
+          <div id="uploadSteps" class="stepper"></div>
         </div>
 
-        <div class="progress-shell" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div id="uploadProgressFill" class="progress-fill" style="width:0%"></div>
-        </div>
-        <div class="progress-meta">
-          <span id="uploadProgressLabel" class="muted">0%</span>
-          <span id="uploadBytesLabel" class="muted">-</span>
+        <div class="seed-preview">
+          <span>Resolved Seed:</span>
+          <strong id="resolvedSeed">(random)</strong>
         </div>
 
-        <div id="uploadSteps" class="stepper"></div>
-      </div>
-
-      <div class="seed-preview">
-        <span>Resolved Seed:</span>
-        <strong id="resolvedSeed">(random)</strong>
-      </div>
-
-      <div class="actions">
-        <button id="uploadWorld" class="secondary">Upload .wld to PVC</button>
-        <button id="createWorld" class="primary">Create world on PVC</button>
-      </div>
-    </section>
-
-    <section class="window window-management">
-      <div class="window-title">Server Management</div>
-
-      <div class="management-toolbar">
-        <button id="refreshMgmt" class="secondary">Refresh</button>
-        <button id="startServer" class="primary">Start</button>
-        <button id="stopServer" class="danger">Stop</button>
-        <button id="restartServer" class="secondary">Restart</button>
-        <span id="mgmtStatus" class="status-chip idle">idle</span>
-      </div>
-
-      <div class="cards">
-        <div class="stat-card"><span>Active World</span><strong id="activeWorld">-</strong></div>
-        <div class="stat-card"><span>Players</span><strong id="playersNow">-</strong></div>
-        <div class="stat-card"><span>Source Up</span><strong id="sourceUp">-</strong></div>
-        <div class="stat-card"><span>Parser Up</span><strong id="parserUp">-</strong></div>
-        <div class="stat-card"><span>Replicas</span><strong id="replicas">-</strong></div>
-        <div class="stat-card"><span>Endpoints</span><strong id="endpoints">-</strong></div>
-      </div>
-
-      <div class="split">
-        <div class="block">
-          <h3>Worlds on PVC</h3>
-          <div id="worldList" class="world-list"></div>
+        <div class="actions">
+          <button id="uploadWorld" class="secondary">Upload .wld to PVC</button>
+          <button id="createWorld" class="primary">Create world on PVC</button>
         </div>
-        <div class="block">
-          <h3>Deployment / Service</h3>
-          <div id="runtimeInfo" class="kv-grid"></div>
-        </div>
-      </div>
+      </section>
 
-      <div class="split">
-        <div class="block">
-          <h3>Pods</h3>
-          <div id="podList" class="pod-list"></div>
-        </div>
-        <div class="block">
-          <h3>Metrics Snapshot</h3>
-          <div id="metricsInfo" class="kv-grid"></div>
-        </div>
-      </div>
+      <section class="window window-management">
+        <div class="window-title">Operations</div>
 
-      <div class="split">
-        <div class="block full">
-          <h3>Terraria Logs (tail)</h3>
-          <pre id="serverLogs">Waiting for data...</pre>
+        <div class="management-toolbar">
+          <button id="refreshMgmt" class="secondary">Refresh</button>
+          <button id="startServer" class="primary">Start</button>
+          <button id="stopServer" class="danger">Stop</button>
+          <button id="restartServer" class="secondary">Restart</button>
+          <span id="mgmtStatus" class="status-chip idle">idle</span>
         </div>
-      </div>
-    </section>
+
+        <div class="cards">
+          <div class="stat-card"><span>Active World</span><strong id="activeWorld">-</strong></div>
+          <div class="stat-card"><span>Players</span><strong id="playersNow">-</strong></div>
+          <div class="stat-card"><span>Source Up</span><strong id="sourceUp">-</strong></div>
+          <div class="stat-card"><span>Parser Up</span><strong id="parserUp">-</strong></div>
+          <div class="stat-card"><span>Replicas</span><strong id="replicas">-</strong></div>
+          <div class="stat-card"><span>Endpoints</span><strong id="endpoints">-</strong></div>
+        </div>
+
+        <div class="split">
+          <div class="block">
+            <h3>Worlds on PVC</h3>
+            <div id="worldList" class="world-list"></div>
+          </div>
+          <div class="block">
+            <h3>Deployment / Service</h3>
+            <div id="runtimeInfo" class="kv-grid"></div>
+          </div>
+        </div>
+
+        <div class="split">
+          <div class="block">
+            <h3>Pods</h3>
+            <div id="podList" class="pod-list"></div>
+          </div>
+          <div class="block">
+            <h3>Metrics Snapshot</h3>
+            <div id="metricsInfo" class="kv-grid"></div>
+          </div>
+        </div>
+
+        <div class="split">
+          <div class="block full">
+            <h3>Terraria Logs (tail)</h3>
+            <pre id="serverLogs">Waiting for data...</pre>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <section class="window window-terminal">
-      <div class="window-title">Command Output</div>
+      <div class="window-title">Output</div>
       <div class="terminal-header">
         <strong>Execution output</strong>
         <span id="runStatus" class="status-chip idle">idle</span>
