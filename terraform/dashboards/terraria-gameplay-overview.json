@@ -1,0 +1,144 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "World Parser Up",
+      "targets": [{"expr": "max(terraria_world_parser_up) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "API Source Up (TShock)",
+      "targets": [{"expr": "max(terraria_exporter_source_up) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Players Online",
+      "targets": [{"expr": "max(terraria_players_online) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0}
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Players Max",
+      "targets": [{"expr": "max(terraria_players_max) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0}
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Hardmode",
+      "targets": [{"expr": "max(terraria_world_hardmode) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0}
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Daytime",
+      "targets": [{"expr": "max(terraria_world_daytime) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0}
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Blood Moon",
+      "targets": [{"expr": "max(terraria_world_blood_moon) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 4}
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Eclipse",
+      "targets": [{"expr": "max(terraria_world_eclipse) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 4}
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "TCP Reachability",
+      "targets": [{"expr": "max(probe_success{job=\"terraria-tcp-probe\"}) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 4}
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "World Time (Current)",
+      "targets": [{"expr": "max(terraria_world_time) or vector(0)"}],
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 4}
+    },
+    {
+      "id": 11,
+      "type": "text",
+      "title": "Notes",
+      "options": {
+        "content": "Gameplay metrics shown here are exactly the metrics currently exported by `terraria-exporter` in your cluster.\\n\\nIf you run the vanilla image, `API Source Up (TShock)` may stay at 0 and that is expected.",
+        "mode": "markdown"
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 4}
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Players Online Over Time",
+      "targets": [{"expr": "max(terraria_players_online) or vector(0)", "legendFormat": "Players"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "World Time Over Time",
+      "targets": [{"expr": "max(terraria_world_time) or vector(0)", "legendFormat": "World Time"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "World Structures",
+      "targets": [
+        {"expr": "max(terraria_world_chests_total) or vector(0)", "legendFormat": "Chests"},
+        {"expr": "max(terraria_world_houses_total) or vector(0)", "legendFormat": "Houses"},
+        {"expr": "max(terraria_world_housed_npcs_total) or vector(0)", "legendFormat": "Housed NPCs"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "World Event Flags",
+      "targets": [
+        {"expr": "max(terraria_world_daytime) or vector(0)", "legendFormat": "Daytime"},
+        {"expr": "max(terraria_world_hardmode) or vector(0)", "legendFormat": "Hardmode"},
+        {"expr": "max(terraria_world_blood_moon) or vector(0)", "legendFormat": "Blood Moon"},
+        {"expr": "max(terraria_world_eclipse) or vector(0)", "legendFormat": "Eclipse"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["terraria", "gameplay", "local"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "title": "Terraria Gameplay Overview",
+  "version": 3
+}

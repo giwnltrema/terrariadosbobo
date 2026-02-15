@@ -34,7 +34,7 @@ Production-style local stack for a Terraria server with observability, backups, 
 - [Screenshots](#screenshots)
 - [World management](#world-management)
 - [Observability](#observability)
-- [Argo CD](#argo-cd)
+- [Argo CD](#argo-cd)`r`n- [Terraform vs Argo CD](#terraform-vs-argo-cd)
 - [Repository structure](#repository-structure)
 - [Troubleshooting](#troubleshooting)
 - [Destroy](#destroy)
@@ -43,7 +43,7 @@ Production-style local stack for a Terraria server with observability, backups, 
 
 | Layer | Components |
 |---|---|
-| Game | `terraria-server` (`ghcr.io/beardedio/terraria:tshock-latest`) + PVC `terraria-config` |
+| Game | `terraria-server` (default `ghcr.io/beardedio/terraria:latest`, configurable) + PVC `terraria-config` |
 | Metrics | Prometheus Operator stack (`kube-prometheus-stack`), `kube-state-metrics`, node exporter |
 | Gameplay metrics | Custom `terraria-exporter` (API + `.wld` parser fallback) |
 | Availability checks | Blackbox exporter + Prometheus `Probe` for Terraria TCP |
@@ -208,7 +208,7 @@ Capture guide: `docs/screenshots/README.md`
 
 ## World management
 
-Terraria styled world creator UI (local web app):
+Terraria styled world + server control UI (local web app):
 
 ```powershell
 ./scripts/world-creator-ui.ps1
@@ -226,7 +226,7 @@ Open `http://127.0.0.1:8787` and create worlds visually with:
 - world evil
 - manual seed
 - special seed library (multi-select)
-- max players
+- max players`r`n- live server snapshot (pods, service, active world, logs, online players from metrics)`r`n- server actions (start, stop, restart deployment)
 
 Multi-selecting special seeds resolves to `get fixed boi` (Zenith mode), matching the combined-special behavior.
 
@@ -302,7 +302,7 @@ Notes:
 - Argo bootstrap `Application` is only created when `argocd_app_repo_url` is configured.
 - Deploy scripts auto-detect your clone `remote.origin.url` by default.
 
-## Repository structure
+## Terraform vs Argo CD`r`n`r`nCurrent recommended model in this repo is **hybrid**:`r`n`r`n1. **Terraform** bootstraps base platform pieces (namespaces, Helm stack, CRDs, Argo CD install).`r`n2. **Argo CD** continuously reconciles Git-defined app manifests.`r`n`r`nImportant details:`r`n`r`n- Moving to Argo **does not move Terraform state** to Argo.`r`n- Terraform state remains Terraform state (local or remote backend if you configure one).`r`n- The Kubernetes cluster stays the **same cluster** (`docker-desktop` locally).`r`n- What changes is the reconciliation owner for app resources (manual/Terraform apply vs GitOps sync by Argo).`r`n`r`nFor a safe migration to full GitOps, do it in phases instead of a big-bang replacement.`r`n`r`n## Repository structure
 
 ```text
 .
@@ -359,4 +359,6 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
+
+
 

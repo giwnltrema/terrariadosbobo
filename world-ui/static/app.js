@@ -33,6 +33,23 @@ const seedModalEl = document.getElementById("seedModal");
 const seedListEl = document.getElementById("seedList");
 const seedSearchEl = document.getElementById("seedSearch");
 
+const mgmtWorldEl = document.getElementById("mgmtWorld");
+const mgmtPlayersOnlineEl = document.getElementById("mgmtPlayersOnline");
+const mgmtPlayersMaxEl = document.getElementById("mgmtPlayersMax");
+const mgmtProbeEl = document.getElementById("mgmtProbe");
+const mgmtExporterEl = document.getElementById("mgmtExporter");
+const mgmtReplicasEl = document.getElementById("mgmtReplicas");
+const mgmtServiceEl = document.getElementById("mgmtService");
+const mgmtImageEl = document.getElementById("mgmtImage");
+const mgmtPodsEl = document.getElementById("mgmtPods");
+const mgmtRecentPlayersEl = document.getElementById("mgmtRecentPlayers");
+const mgmtLogsEl = document.getElementById("mgmtLogs");
+
+const refreshManagementEl = document.getElementById("refreshManagement");
+const startServerEl = document.getElementById("startServer");
+const stopServerEl = document.getElementById("stopServer");
+const restartServerEl = document.getElementById("restartServer");
+
 function setStatus(mode, text) {
   runStatusEl.className = `status ${mode}`;
   runStatusEl.textContent = text;
@@ -50,6 +67,18 @@ function fmtTimestamp(epoch) {
   if (!n) return "unknown";
   const d = new Date(n * 1000);
   return d.toLocaleString();
+}
+
+function fmtOnOff(v) {
+  const n = Number(v || 0);
+  return n >= 1 ? "ON" : "OFF";
+}
+
+function fmtNum(v, fallback = "0") {
+  if (v === null || v === undefined) return fallback;
+  const n = Number(v);
+  if (Number.isNaN(n)) return fallback;
+  return `${Math.round(n * 100) / 100}`;
 }
 
 function getClusterScope() {
@@ -262,6 +291,96 @@ async function loadWorlds() {
   }
 }
 
+function renderManagement(data) {
+  const m = data.metrics || {};
+  mgmtWorldEl.textContent = data.active_world?.world || "(nao definido)";
+  mgmtPlayersOnlineEl.textContent = fmtNum(m.players_online, "0");
+  mgmtPlayersMaxEl.textContent = fmtNum(m.players_max, "0");
+  mgmtProbeEl.textContent = fmtOnOff(m.tcp_probe_up);
+  mgmtExporterEl.textContent = fmtOnOff(m.exporter_up);
+
+  const available = fmtNum(data.deployment?.replicas_available, "0");
+  const unavailable = fmtNum(data.deployment?.replicas_unavailable, "0");
+  mgmtReplicasEl.textContent = `${available} / ${unavailable}`;
+
+  const ports = (data.service?.node_ports || []).join(", ");
+  mgmtServiceEl.textContent = ports || "-";
+  mgmtImageEl.textContent = data.deployment?.image || "-";
+
+  const pods = data.pods || [];
+  if (!pods.length) {
+    mgmtPodsEl.textContent = "No pods found";
+  } else {
+    mgmtPodsEl.textContent = pods
+      .map((p) => `${p.name} | phase=${p.phase} | ready=${p.ready_containers}/${p.total_containers} | restarts=${p.restarts}`)
+      .join("\n");
+  }
+
+  const recentPlayers = data.recent_players || [];
+  mgmtRecentPlayersEl.textContent = recentPlayers.length ? recentPlayers.join("\n") : "No recent player join events";
+
+  mgmtLogsEl.textContent = data.logs_tail || "(no logs)";
+}
+
+async function loadManagement() {
+  const scope = getClusterScope();
+  const params = new URLSearchParams({
+    namespace: scope.namespace,
+    deployment: scope.deployment,
+    pvc_name: scope.pvc_name,
+  });
+
+  try {
+    const response = await fetch(`/api/management?${params.toString()}`);
+    const result = await response.json();
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || `HTTP ${response.status}`);
+    }
+    renderManagement(result);
+  } catch (error) {
+    mgmtPodsEl.textContent = `Failed to load management data: ${error}`;
+  }
+}
+
+async function serverAction(action) {
+  const scope = getClusterScope();
+  const payload = {
+    action,
+    namespace: scope.namespace,
+    deployment: scope.deployment,
+  };
+
+  outputEl.textContent = `Running server action: ${action}...`;
+  setStatus("running", "running");
+
+  try {
+    const response = await fetch("/api/server-action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || result.output || `HTTP ${response.status}`);
+    }
+
+    outputEl.textContent = [
+      `ok: ${result.ok}`,
+      `action: ${result.action}`,
+      `duration_seconds: ${result.duration_seconds}`,
+      "",
+      "output:",
+      result.output || "(no output)",
+    ].join("\n");
+
+    setStatus("success", "success");
+    await loadManagement();
+  } catch (error) {
+    outputEl.textContent = `Server action failed: ${error}`;
+    setStatus("error", "error");
+  }
+}
+
 function openModal() {
   seedModalEl.classList.remove("hidden");
 }
@@ -330,6 +449,7 @@ async function createWorld() {
     setStatus(result.ok ? "success" : "error", result.ok ? "success" : "error");
 
     await loadWorlds();
+    await loadManagement();
   } catch (error) {
     outputEl.textContent = `Request failed: ${error}`;
     setStatus("error", "error");
@@ -372,6 +492,11 @@ function boot() {
 
   document.getElementById("createWorld").addEventListener("click", createWorld);
 
+  refreshManagementEl.addEventListener("click", loadManagement);
+  startServerEl.addEventListener("click", () => serverAction("start"));
+  stopServerEl.addEventListener("click", () => serverAction("stop"));
+  restartServerEl.addEventListener("click", () => serverAction("restart"));
+
   setStatus("idle", "idle");
   refreshSeedSummary();
   refreshWorldModeUI();
@@ -382,6 +507,8 @@ function boot() {
   });
 
   loadWorlds();
+  loadManagement();
+  setInterval(loadManagement, 20000);
 }
 
 boot();

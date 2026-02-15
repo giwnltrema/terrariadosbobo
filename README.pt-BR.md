@@ -34,7 +34,7 @@ Stack local estilo producao para servidor de Terraria com observabilidade, backu
 - [Screenshots](#screenshots)
 - [Gerenciamento de mundo](#gerenciamento-de-mundo)
 - [Observabilidade](#observabilidade)
-- [Argo CD](#argo-cd)
+- [Argo CD](#argo-cd)`r`n- [Terraform vs Argo CD](#terraform-vs-argo-cd)
 - [Estrutura do repositorio](#estrutura-do-repositorio)
 - [Troubleshooting](#troubleshooting)
 - [Destroy](#destroy)
@@ -43,7 +43,7 @@ Stack local estilo producao para servidor de Terraria com observabilidade, backu
 
 | Camada | Componentes |
 |---|---|
-| Jogo | `terraria-server` (`ghcr.io/beardedio/terraria:tshock-latest`) + PVC `terraria-config` |
+| Jogo | `terraria-server` (padrao `ghcr.io/beardedio/terraria:latest`, configuravel) + PVC `terraria-config` |
 | Metricas | Stack Prometheus Operator (`kube-prometheus-stack`), `kube-state-metrics`, node exporter |
 | Metricas de gameplay | `terraria-exporter` custom (API + fallback parser de `.wld`) |
 | Disponibilidade | Blackbox exporter + `Probe` TCP do servidor |
@@ -208,7 +208,7 @@ Guia de captura: `docs/screenshots/README.md`
 
 ## Gerenciamento de mundo
 
-UI visual tematica Terraria para criacao de mundo (app web local):
+UI visual tematica Terraria para criacao de mundo + gerenciamento do servidor (app web local):
 
 ```powershell
 ./scripts/world-creator-ui.ps1
@@ -226,7 +226,7 @@ Abra `http://127.0.0.1:8787` e crie mapas visualmente com:
 - tipo de evil
 - seed manual
 - biblioteca de seeds especiais (multi-select)
-- maximo de players
+- maximo de players`r`n- snapshot de runtime (pods, service, mundo ativo, logs, players online por metricas)`r`n- acoes de servidor (start, stop, restart do deployment)
 
 Ao selecionar multiplas seeds especiais, a UI resolve para `get fixed boi` (modo Zenith), seguindo o comportamento de combinacao.
 
@@ -302,7 +302,7 @@ Notas:
 - A Application bootstrap so e criada se `argocd_app_repo_url` estiver configurado.
 - Os scripts de deploy detectam `remote.origin.url` automaticamente por padrao.
 
-## Estrutura do repositorio
+## Terraform vs Argo CD`r`n`r`nModelo recomendado atual neste repositorio: **hibrido**.`r`n`r`n1. **Terraform** faz bootstrap da base (namespaces, stack Helm, CRDs, instalacao do Argo CD).`r`n2. **Argo CD** reconcilia continuamente os manifests definidos no Git.`r`n`r`nPontos importantes:`r`n`r`n- Ir para Argo **nao move o state do Terraform** para o Argo.`r`n- O state continua sendo state do Terraform (local ou backend remoto, se voce configurar).`r`n- O cluster Kubernetes continua o **mesmo cluster** (`docker-desktop` local).`r`n- O que muda e o dono da reconciliacao dos recursos de app (apply manual/Terraform vs sync GitOps do Argo).`r`n`r`nPara migracao segura para GitOps completo, faca em fases e nao em big-bang.`r`n`r`n## Estrutura do repositorio
 
 ```text
 .
@@ -359,4 +359,6 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
+
+
 

@@ -423,3 +423,119 @@ pre {
   .actions .btn { width: 100%; }
   .mode-switch { grid-template-columns: 1fr; }
 }
+
+.management-window {
+  margin-top: 12px;
+  padding: 10px;
+  border: 4px solid var(--panel-border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--panel-inner) 0%, var(--panel) 52%, var(--panel-dark) 100%);
+  box-shadow:
+    0 0 0 3px rgba(114, 131, 230, 0.5) inset,
+    0 12px 36px rgba(8, 17, 47, 0.6);
+}
+
+.management-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.management-header h2 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.management-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.management-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mgmt-card {
+  border: 2px solid rgba(18, 31, 80, 0.95);
+  border-radius: 10px;
+  background: rgba(17, 29, 80, 0.5);
+  padding: 8px;
+  min-height: 82px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.mgmt-card.wide {
+  grid-column: span 2;
+}
+
+.mgmt-card span {
+  color: #d7ddff;
+  font-size: 20px;
+}
+
+.mgmt-card strong {
+  font-size: 24px;
+  color: #f5f7ff;
+  word-break: break-word;
+}
+
+.management-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.management-block {
+  border: 2px solid rgba(18, 31, 80, 0.95);
+  border-radius: 10px;
+  background: rgba(17, 29, 80, 0.5);
+  padding: 8px;
+}
+
+.management-block h3 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.management-block pre {
+  min-height: 120px;
+  max-height: 260px;
+}
+
+@media (max-width: 980px) {
+  .management-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .management-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .management-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .management-actions .btn {
+    width: 100%;
+  }
+
+  .management-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mgmt-card.wide {
+    grid-column: span 1;
+  }
+}

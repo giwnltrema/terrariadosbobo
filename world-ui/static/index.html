@@ -17,7 +17,7 @@
   <main class="screen">
     <header class="logo-wrap">
       <h1 class="logo-text">Terraria</h1>
-      <p class="logo-subtitle">World Creation Console</p>
+      <p class="logo-subtitle">World + Server Control Console</p>
     </header>
 
     <section class="game-window">
@@ -119,6 +119,45 @@
 
       <div class="actions">
         <button id="createWorld" class="btn primary">Aplicar no servidor</button>
+      </div>
+    </section>
+
+    <section class="management-window">
+      <div class="management-header">
+        <h2>Server Management</h2>
+        <div class="management-actions">
+          <button id="refreshManagement" class="btn secondary">Refresh</button>
+          <button id="startServer" class="btn secondary">Start</button>
+          <button id="stopServer" class="btn ghost">Stop</button>
+          <button id="restartServer" class="btn primary">Restart</button>
+        </div>
+      </div>
+
+      <div class="management-grid">
+        <div class="mgmt-card"><span>World Ativo</span><strong id="mgmtWorld">-</strong></div>
+        <div class="mgmt-card"><span>Players Online</span><strong id="mgmtPlayersOnline">-</strong></div>
+        <div class="mgmt-card"><span>Players Max</span><strong id="mgmtPlayersMax">-</strong></div>
+        <div class="mgmt-card"><span>TCP Probe</span><strong id="mgmtProbe">-</strong></div>
+        <div class="mgmt-card"><span>Exporter</span><strong id="mgmtExporter">-</strong></div>
+        <div class="mgmt-card"><span>Replicas (A/U)</span><strong id="mgmtReplicas">-</strong></div>
+        <div class="mgmt-card"><span>Service</span><strong id="mgmtService">-</strong></div>
+        <div class="mgmt-card wide"><span>Image</span><strong id="mgmtImage">-</strong></div>
+      </div>
+
+      <div class="management-split">
+        <div class="management-block">
+          <h3>Pods</h3>
+          <pre id="mgmtPods">Waiting...</pre>
+        </div>
+        <div class="management-block">
+          <h3>Recent Players</h3>
+          <pre id="mgmtRecentPlayers">Waiting...</pre>
+        </div>
+      </div>
+
+      <div class="management-block">
+        <h3>Server Logs (tail)</h3>
+        <pre id="mgmtLogs">Waiting...</pre>
       </div>
     </section>
 
