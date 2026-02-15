@@ -35,6 +35,10 @@ spec:
               value: /config/test.wld
             - name: SERVER_CONFIG_PATH
               value: /config/serverconfig.txt
+            - name: TSHOCK_CONFIG_PATH
+              value: /config/config.json
+            - name: DEFAULT_MAX_PLAYERS
+              value: "8"
             - name: WORLD_PARSE_INTERVAL
               value: "30"
             - name: CHEST_ITEM_SERIES_LIMIT

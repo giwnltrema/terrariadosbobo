@@ -35,6 +35,38 @@
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 }
     },
     {
+      "id": 10,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Parser Unsupported",
+      "targets": [{ "expr": "max(terraria_world_parser_unsupported_version) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Conn Attempts (Window)",
+      "targets": [{ "expr": "max(terraria_log_connection_attempts_window) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "World Saves (Window)",
+      "targets": [{ "expr": "max(terraria_log_world_saves_window) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Players Max",
+      "targets": [{ "expr": "max(terraria_players_max) or vector(8)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 }
+    },
+    {
       "id": 5,
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -44,7 +76,7 @@
         { "expr": "max(terraria_players_online_api) or vector(0)", "legendFormat": "API" },
         { "expr": "max(terraria_players_online_log) or vector(0)", "legendFormat": "Log fallback" }
       ],
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
     },
     {
       "id": 6,
@@ -57,7 +89,7 @@
         { "expr": "max(terraria_world_eclipse) or vector(0)", "legendFormat": "Eclipse" },
         { "expr": "max(terraria_world_hardmode) or vector(0)", "legendFormat": "Hardmode" }
       ],
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
     },
     {
       "id": 7,
@@ -65,7 +97,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "title": "World Snapshot Age (seconds)",
       "targets": [{ "expr": "max(terraria_world_snapshot_age_seconds) or vector(0)" }],
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
     },
     {
       "id": 8,
@@ -73,7 +105,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "title": "Probe TCP Reachability",
       "targets": [{ "expr": "max(probe_success{job=\"terraria-tcp-probe\"}) or vector(0)" }],
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 12 }
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 16 }
     },
     {
       "id": 9,
@@ -81,7 +113,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "title": "Fallback In Use",
       "targets": [{ "expr": "((max(terraria_players_online_log) > 0) * 1) or vector(0)" }],
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 16 }
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 20 }
     }
   ],
   "schemaVersion": 39,

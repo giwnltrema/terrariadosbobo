@@ -13,7 +13,7 @@ data:
         uid: prometheus
         type: prometheus
         access: proxy
-        url: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc.cluster.local:9090
+        url: http://terrariadosbobo-kube-prom-prometheus.monitoring.svc.cluster.local:9090
         isDefault: true
         editable: true
         jsonData:

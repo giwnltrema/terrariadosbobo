@@ -19,6 +19,7 @@ SCRAPE_INTERVAL = int(os.getenv("SCRAPE_INTERVAL", "15"))
 EXPORTER_PORT = int(os.getenv("EXPORTER_PORT", "9150"))
 WORLD_FILE_PATH = os.getenv("WORLD_FILE_PATH", "")
 SERVER_CONFIG_PATH = os.getenv("SERVER_CONFIG_PATH", "/config/serverconfig.txt")
+TSHOCK_CONFIG_PATH = os.getenv("TSHOCK_CONFIG_PATH", "/config/config.json")
 CHEST_ITEM_SERIES_LIMIT = int(os.getenv("CHEST_ITEM_SERIES_LIMIT", "500"))
 
 K8S_NAMESPACE = os.getenv("K8S_NAMESPACE", "terraria")
@@ -26,11 +27,27 @@ K8S_TERRARIA_LABEL_SELECTOR = os.getenv("K8S_TERRARIA_LABEL_SELECTOR", "app=terr
 K8S_TERRARIA_CONTAINER = os.getenv("K8S_TERRARIA_CONTAINER", "terraria")
 K8S_LOG_TAIL_LINES = int(os.getenv("K8S_LOG_TAIL_LINES", "2000"))
 ENABLE_LOG_PLAYER_TRACKER = os.getenv("ENABLE_LOG_PLAYER_TRACKER", "true").strip().lower() in {"1", "true", "yes", "on"}
+try:
+    DEFAULT_MAX_PLAYERS = float(os.getenv("DEFAULT_MAX_PLAYERS", "8"))
+except ValueError:
+    DEFAULT_MAX_PLAYERS = 8.0
 
 source_up = Gauge("terraria_exporter_source_up", "1 se API de gameplay respondeu")
 world_parser_up = Gauge("terraria_world_parser_up", "1 se parser do arquivo .wld respondeu")
 world_runtime_up = Gauge("terraria_world_runtime_up", "1 se runtime do mundo veio de API/log em tempo real")
 log_tracker_up = Gauge("terraria_log_tracker_up", "1 se fallback de logs Kubernetes funcionou")
+world_parser_unsupported = Gauge(
+    "terraria_world_parser_unsupported_version",
+    "1 se versao .wld atual nao e suportada pelo parser instalado",
+)
+log_connection_attempts_window = Gauge(
+    "terraria_log_connection_attempts_window",
+    "Quantidade de conexoes detectadas nas ultimas linhas de log analisadas",
+)
+log_world_saves_window = Gauge(
+    "terraria_log_world_saves_window",
+    "Quantidade de ciclos de save detectados nas ultimas linhas de log analisadas",
+)
 
 players_online = Gauge("terraria_players_online", "Quantidade de jogadores online (API ou fallback logs)")
 players_online_api = Gauge("terraria_players_online_api", "Quantidade de jogadores online via API")
@@ -70,6 +87,8 @@ LEAVE_PATTERNS = [
     re.compile(r"(?P<player>[A-Za-z0-9_ ]{2,32}) has left", re.IGNORECASE),
     re.compile(r"(?P<player>[A-Za-z0-9_ ]{2,32}) left the game", re.IGNORECASE),
 ]
+CONNECTION_PATTERN = re.compile(r"(?:\d{1,3}\.){3}\d{1,3}:\d+\s+is connecting", re.IGNORECASE)
+WORLD_SAVE_PATTERN = re.compile(r"backing up world file", re.IGNORECASE)
 
 
 def _as_bool(value: Any) -> int:
@@ -187,11 +206,37 @@ def _read_max_players_from_config() -> Optional[float]:
     return None
 
 
+def _read_max_players_from_tshock_config() -> Optional[float]:
+    path = Path(TSHOCK_CONFIG_PATH)
+    if not path.exists() or not path.is_file():
+        return None
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    settings = payload.get("Settings", {})
+    if not isinstance(settings, dict):
+        return None
+
+    value = settings.get("MaxSlots")
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 def _reset_metrics() -> None:
     source_up.set(0)
     world_parser_up.set(0)
     world_runtime_up.set(0)
     log_tracker_up.set(0)
+    world_parser_unsupported.set(0)
+    log_connection_attempts_window.set(0)
+    log_world_saves_window.set(0)
 
     players_online.set(0)
     players_online_api.set(0)
@@ -327,6 +372,8 @@ class KubernetesLogTracker:
             "blood_moon": None,
             "eclipse": None,
             "daytime": None,
+            "connection_attempts": 0,
+            "world_saves": 0,
         }
 
         if not self._enabled():
@@ -345,11 +392,19 @@ class KubernetesLogTracker:
         blood_moon: Optional[int] = None
         eclipse: Optional[int] = None
         daytime: Optional[int] = None
+        connection_attempts = 0
+        world_saves = 0
 
         for raw_line in raw_logs.splitlines():
             line = _sanitize_log_message(raw_line)
             if not line:
                 continue
+            lowered = line.lower()
+
+            if CONNECTION_PATTERN.search(line):
+                connection_attempts += 1
+            if WORLD_SAVE_PATTERN.search(lowered):
+                world_saves += 1
 
             join_player = _extract_player(JOIN_PATTERNS, line)
             if join_player:
@@ -359,7 +414,6 @@ class KubernetesLogTracker:
             if leave_player:
                 online.pop(leave_player.lower(), None)
 
-            lowered = line.lower()
             if "blood moon is rising" in lowered:
                 blood_moon = 1
             elif "blood moon is over" in lowered or "blood moon has ended" in lowered:
@@ -381,6 +435,8 @@ class KubernetesLogTracker:
         result["blood_moon"] = blood_moon
         result["eclipse"] = eclipse
         result["daytime"] = daytime
+        result["connection_attempts"] = connection_attempts
+        result["world_saves"] = world_saves
         return result
 
 
@@ -546,7 +602,14 @@ def _update_from_world_file() -> Dict[str, Any]:
     except Exception:
         pass
 
-    world = World.create_from_file(str(world_file))
+    try:
+        world = World.create_from_file(str(world_file))
+    except NotImplementedError:
+        world_parser_unsupported.set(1)
+        return response
+    except Exception:
+        return response
+
     world_parser_up.set(1)
     response["snapshot_up"] = True
 
@@ -611,6 +674,8 @@ def _apply_log_fallback(tracker: KubernetesLogTracker, api_data: Dict[str, Any])
     log_tracker_up.set(1)
     log_players = float(result.get("players_online", 0))
     players_online_log.set(log_players)
+    log_connection_attempts_window.set(float(result.get("connection_attempts", 0)))
+    log_world_saves_window.set(float(result.get("world_saves", 0)))
 
     if api_data.get("players_online") is None:
         players_online.set(log_players)
@@ -625,6 +690,12 @@ def _apply_log_fallback(tracker: KubernetesLogTracker, api_data: Dict[str, Any])
 
     if result.get("daytime") is not None and not api_data.get("runtime_world_up"):
         world_daytime.set(int(result["daytime"]))
+        world_runtime_up.set(1)
+
+    if (
+        not api_data.get("runtime_world_up")
+        and (result.get("connection_attempts", 0) > 0 or result.get("world_saves", 0) > 0)
+    ):
         world_runtime_up.set(1)
 
 
@@ -644,8 +715,11 @@ def scrape_once(tracker: KubernetesLogTracker) -> None:
 
     if (api_data or {}).get("players_max") is None:
         max_from_config = _read_max_players_from_config()
-        if max_from_config is not None:
-            players_max.set(max_from_config)
+        if max_from_config is None:
+            max_from_config = _read_max_players_from_tshock_config()
+        if max_from_config is None:
+            max_from_config = DEFAULT_MAX_PLAYERS
+        players_max.set(max_from_config)
 
     try:
         _apply_log_fallback(tracker, api_data or {})

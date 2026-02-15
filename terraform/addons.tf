@@ -82,7 +82,7 @@ resource "kubernetes_config_map" "grafana_loki_datasource" {
           uid: loki
           type: loki
           access: proxy
-          url: http://loki-stack.monitoring.svc.cluster.local:3100
+          url: http://terrariadosbobo-loki-stack.monitoring.svc.cluster.local:3100
           isDefault: false
           editable: true
           jsonData:
@@ -112,7 +112,7 @@ resource "kubernetes_config_map" "grafana_prometheus_datasource" {
           uid: prometheus
           type: prometheus
           access: proxy
-          url: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc.cluster.local:9090
+          url: http://terrariadosbobo-kube-prom-prometheus.monitoring.svc.cluster.local:9090
           isDefault: true
           editable: true
           jsonData:
