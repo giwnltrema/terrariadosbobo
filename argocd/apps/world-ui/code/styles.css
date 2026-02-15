@@ -222,6 +222,104 @@ button.danger {
   font-size: 22px;
 }
 
+.upload-panel {
+  margin-top: 12px;
+  border: 2px solid #5b6dcb;
+  border-radius: 10px;
+  background: rgba(8, 14, 43, 0.64);
+  padding: 10px;
+}
+
+.upload-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.progress-shell {
+  margin-top: 10px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(180, 255, 154, 0.55);
+  background: rgba(1, 4, 17, 0.65);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(143, 255, 104, 0.25), rgba(143, 255, 104, 0.95));
+  box-shadow: 0 0 18px rgba(143, 255, 104, 0.25);
+  transition: width 0.15s ease;
+}
+
+.progress-meta {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 20px;
+}
+
+.stepper {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.step {
+  border: 1px solid rgba(112, 131, 228, 0.45);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(2, 5, 19, 0.48);
+  min-height: 56px;
+}
+
+.step-title {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 20px;
+}
+
+.step-title strong {
+  font-size: 21px;
+}
+
+.step small {
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.step.state-pending strong {
+  color: var(--muted);
+}
+
+.step.state-active {
+  border-color: rgba(180, 255, 154, 0.8);
+  box-shadow: 0 0 0 2px rgba(180, 255, 154, 0.18) inset;
+}
+
+.step.state-active strong {
+  color: var(--warning);
+}
+
+.step.state-done strong {
+  color: var(--accent);
+}
+
+.step.state-error {
+  border-color: rgba(255, 101, 112, 0.75);
+}
+
+.step.state-error strong {
+  color: var(--danger);
+}
+
 .seed-preview strong {
   color: var(--accent);
 }
@@ -523,10 +621,18 @@ pre {
   .actions button {
     width: 100%;
   }
+
+  .stepper {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 520px) {
   .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .stepper {
     grid-template-columns: 1fr;
   }
 }

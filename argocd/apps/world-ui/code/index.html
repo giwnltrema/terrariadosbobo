@@ -102,6 +102,23 @@
         </div>
       </div>
 
+      <div class="upload-panel" aria-live="polite">
+        <div class="upload-header">
+          <strong>Upload Status</strong>
+          <span id="uploadStatus" class="status-chip idle">idle</span>
+        </div>
+
+        <div class="progress-shell" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="uploadProgressFill" class="progress-fill" style="width:0%"></div>
+        </div>
+        <div class="progress-meta">
+          <span id="uploadProgressLabel" class="muted">0%</span>
+          <span id="uploadBytesLabel" class="muted">-</span>
+        </div>
+
+        <div id="uploadSteps" class="stepper"></div>
+      </div>
+
       <div class="seed-preview">
         <span>Resolved Seed:</span>
         <strong id="resolvedSeed">(random)</strong>

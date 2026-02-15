@@ -5,7 +5,10 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
 import time
+import uuid
+from collections import deque
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -112,6 +115,10 @@ SPECIAL_SEEDS = [
     },
 ]
 
+JOBS_LOCK = threading.Lock()
+JOBS: Dict[str, Dict] = {}
+JOB_LOG_MAX_LINES = 600
+
 
 def now_rfc3339() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -177,6 +184,56 @@ def run_subprocess(command: List[str], timeout: int = 1200, cwd: Path = REPO_ROO
         "output": output,
         "duration_seconds": round(time.time() - started, 2),
     }
+
+
+def job_create(kind: str, meta: Dict) -> Dict:
+    job_id = uuid.uuid4().hex
+    job = {
+        "id": job_id,
+        "kind": kind,
+        "status": "running",
+        "stage": "starting",
+        "created_at": now_rfc3339(),
+        "started_at": now_rfc3339(),
+        "finished_at": None,
+        "ok": None,
+        "exit_code": None,
+        "duration_seconds": None,
+        "meta": meta or {},
+        "log": deque(maxlen=JOB_LOG_MAX_LINES),
+    }
+    with JOBS_LOCK:
+        JOBS[job_id] = job
+    return job
+
+
+def job_get(job_id: str) -> Optional[Dict]:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if not job:
+            return None
+        # Return a JSON-serializable snapshot.
+        snap = dict(job)
+        snap["log"] = list(job["log"])
+        return snap
+
+
+def job_update(job_id: str, **fields) -> None:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if not job:
+            return
+        job.update(fields)
+
+
+def job_append(job_id: str, line: str) -> None:
+    if not line:
+        return
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if not job:
+            return
+        job["log"].append(line)
 
 
 def kubectl(args: List[str], timeout: int = 120) -> Dict:
@@ -355,10 +412,10 @@ def sanitize_world_name(world_name: str, fallback_name: str) -> str:
     return candidate
 
 
-def handle_world_upload(content_type: str, headers, body_stream) -> Dict:
+def save_world_upload_to_tmp(content_type: str, headers, body_stream) -> Tuple[Optional[Dict], Optional[str]]:
     content_type = content_type or ""
     if "multipart/form-data" not in content_type:
-        return {"ok": False, "error": "Content-Type must be multipart/form-data"}
+        return None, "Content-Type must be multipart/form-data"
 
     content_length = headers.get("Content-Length", "0")
     form = cgi.FieldStorage(
@@ -374,7 +431,7 @@ def handle_world_upload(content_type: str, headers, body_stream) -> Dict:
 
     file_item = form["world_file"] if "world_file" in form else None
     if file_item is None or not getattr(file_item, "file", None):
-        return {"ok": False, "error": "world_file is required"}
+        return None, "world_file is required"
 
     uploaded_name = os.path.basename(getattr(file_item, "filename", "") or "")
     manual_name = form.getfirst("world_name", "")
@@ -383,33 +440,100 @@ def handle_world_upload(content_type: str, headers, body_stream) -> Dict:
     tmp_dir = Path(tempfile.mkdtemp(prefix="terraria-world-upload-"))
     tmp_file = tmp_dir / world_name
 
+    with tmp_file.open("wb") as target:
+        while True:
+            chunk = file_item.file.read(1024 * 1024)
+            if not chunk:
+                break
+            target.write(chunk)
+
+    if tmp_file.stat().st_size == 0:
+        return None, "Uploaded file is empty"
+
+    return {
+        "world_name": world_name,
+        "tmp_dir": str(tmp_dir),
+        "tmp_file": str(tmp_file),
+        "bytes": tmp_file.stat().st_size,
+    }, None
+
+
+def stage_from_line(line: str) -> Optional[str]:
+    l = (line or "").lower()
+    if "escalando" in l and "replicas" in l:
+        return "scale_down"
+    if "pod auxiliar" in l or "world-manager" in l:
+        return "manager_pod"
+    if "copiando arquivo" in l:
+        return "copy_world"
+    if "configurando deployment" in l:
+        return "set_env"
+    if "subindo deployment" in l:
+        return "rollout"
+    if "mundo pronto" in l:
+        return "done"
+    return None
+
+
+def run_upload_job(job_id: str, tmp_dir: Path, tmp_file: Path, world_name: str, bytes_size: int) -> None:
+    started = time.time()
+    command = build_upload_world_command(tmp_file, world_name)
+    job_update(job_id, stage="running_script")
+    job_append(job_id, f"$ {' '.join(command)}")
+
     try:
-        with tmp_file.open("wb") as target:
-            while True:
-                chunk = file_item.file.read(1024 * 1024)
-                if not chunk:
-                    break
-                target.write(chunk)
+        proc = subprocess.Popen(
+            command,
+            cwd=str(REPO_ROOT),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+    except FileNotFoundError as exc:
+        job_append(job_id, f"Executable not found: {exc}")
+        job_update(
+            job_id,
+            status="error",
+            ok=False,
+            exit_code=127,
+            finished_at=now_rfc3339(),
+            duration_seconds=round(time.time() - started, 2),
+        )
+        return
 
-        if tmp_file.stat().st_size == 0:
-            return {"ok": False, "error": "Uploaded file is empty"}
+    assert proc.stdout is not None
+    for raw_line in proc.stdout:
+        line = raw_line.rstrip("\n")
+        job_append(job_id, line)
+        stage = stage_from_line(line)
+        if stage:
+            job_update(job_id, stage=stage)
 
-        command = build_upload_world_command(tmp_file, world_name)
-        result = run_subprocess(command, timeout=3600)
-        return {
-            "ok": result["ok"],
+    rc = proc.wait()
+    ok = rc == 0
+    job_update(
+        job_id,
+        status="success" if ok else "error",
+        ok=ok,
+        exit_code=rc,
+        finished_at=now_rfc3339(),
+        duration_seconds=round(time.time() - started, 2),
+        meta={
             "world_name": world_name,
-            "bytes": tmp_file.stat().st_size,
+            "bytes": bytes_size,
             "command": command,
-            **result,
-        }
-    finally:
-        try:
-            if tmp_file.exists():
-                tmp_file.unlink()
+        },
+    )
+    if not ok:
+        job_append(job_id, f"(exit code {rc})")
+
+    try:
+        if tmp_file.exists():
+            tmp_file.unlink()
+        if tmp_dir.exists():
             tmp_dir.rmdir()
-        except OSError:
-            pass
+    except OSError:
+        pass
 
 
 def get_terraria_pods(namespace: str, app_label: str) -> List[Dict]:
@@ -674,6 +798,12 @@ class WorldCreatorHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path.startswith("/api/jobs/"):
+            job_id = parsed.path.split("/api/jobs/")[1].strip("/")
+            job = job_get(job_id)
+            if not job:
+                return self.send_json(404, {"ok": False, "error": "job not found"})
+            return self.send_json(200, {"ok": True, "job": job})
         if parsed.path == "/api/health":
             return self.send_json(
                 200,
@@ -709,8 +839,33 @@ class WorldCreatorHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/upload-world":
             content_type = self.headers.get("Content-Type", "")
-            result = handle_world_upload(content_type, self.headers, self.rfile)
-            return self.send_json(200 if result.get("ok") else 500, result)
+            saved, err = save_world_upload_to_tmp(content_type, self.headers, self.rfile)
+            if err:
+                return self.send_json(400, {"ok": False, "error": err})
+
+            assert saved is not None
+            world_name = str(saved["world_name"])
+            tmp_dir = Path(str(saved["tmp_dir"]))
+            tmp_file = Path(str(saved["tmp_file"]))
+            bytes_size = int(saved.get("bytes", 0))
+
+            job = job_create(
+                "upload-world",
+                {
+                    "world_name": world_name,
+                    "bytes": bytes_size,
+                },
+            )
+            job_update(job["id"], stage="uploaded")
+
+            thread = threading.Thread(
+                target=run_upload_job,
+                args=(job["id"], tmp_dir, tmp_file, world_name, bytes_size),
+                daemon=True,
+            )
+            thread.start()
+
+            return self.send_json(202, {"ok": True, "job_id": job["id"], "world_name": world_name, "bytes": bytes_size})
 
         if parsed.path == "/api/create-world":
             payload, err = self.parse_json_body()

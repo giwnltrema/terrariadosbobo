@@ -6,6 +6,8 @@ const state = {
   specialSeeds: [],
   managementTimer: null,
   lastManagement: null,
+  uploadPollTimer: null,
+  currentUploadJobId: null,
 };
 
 const worldNameEl = document.getElementById("worldName");
@@ -36,9 +38,170 @@ const podListEl = document.getElementById("podList");
 const metricsInfoEl = document.getElementById("metricsInfo");
 const serverLogsEl = document.getElementById("serverLogs");
 
+const uploadStatusEl = document.getElementById("uploadStatus");
+const uploadProgressFillEl = document.getElementById("uploadProgressFill");
+const uploadProgressLabelEl = document.getElementById("uploadProgressLabel");
+const uploadBytesLabelEl = document.getElementById("uploadBytesLabel");
+const uploadStepsEl = document.getElementById("uploadSteps");
+
 function setStatus(chipEl, mode, text) {
   chipEl.className = `status-chip ${mode}`;
   chipEl.textContent = text;
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes || 0);
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let idx = 0;
+  let v = value;
+  while (v >= 1024 && idx < units.length - 1) {
+    v /= 1024;
+    idx += 1;
+  }
+  const digits = idx === 0 ? 0 : idx === 1 ? 1 : 2;
+  return `${v.toFixed(digits)} ${units[idx]}`;
+}
+
+function setUploadProgress(percent, sentBytes, totalBytes, mode = "uploading") {
+  const pct = Math.max(0, Math.min(100, Number(percent || 0)));
+  uploadProgressFillEl.style.width = `${pct}%`;
+  uploadProgressLabelEl.textContent = mode === "processing" ? `processing (${pct}%)` : `${pct}%`;
+
+  if (totalBytes && Number.isFinite(Number(totalBytes))) {
+    uploadBytesLabelEl.textContent = `${formatBytes(sentBytes)} / ${formatBytes(totalBytes)}`;
+  } else if (sentBytes) {
+    uploadBytesLabelEl.textContent = `${formatBytes(sentBytes)}`;
+  } else {
+    uploadBytesLabelEl.textContent = "-";
+  }
+
+  const shell = uploadProgressFillEl.parentElement;
+  if (shell) {
+    shell.setAttribute("aria-valuenow", String(pct));
+  }
+}
+
+const UPLOAD_STEPS = [
+  { id: "uploaded", title: "Upload received", hint: "File received by the UI pod" },
+  { id: "running_script", title: "Start job", hint: "Running upload-world script" },
+  { id: "scale_down", title: "Scale down", hint: "Scale Terraria to 0 replicas" },
+  { id: "manager_pod", title: "Mount PVC", hint: "Start world-manager with /config mounted" },
+  { id: "copy_world", title: "Copy world", hint: "Copy .wld into the PVC" },
+  { id: "set_env", title: "Set active", hint: "Set active world env + config" },
+  { id: "rollout", title: "Rollout", hint: "Bring Terraria back and wait rollout" },
+  { id: "done", title: "Done", hint: "World is ready" },
+];
+
+function stageIndex(stageId) {
+  if (!stageId) {
+    return -1;
+  }
+  const idx = UPLOAD_STEPS.findIndex((step) => step.id === stageId);
+  return idx;
+}
+
+function renderUploadSteps(currentStage, status = "running") {
+  const currentIdx = stageIndex(currentStage);
+  uploadStepsEl.innerHTML = "";
+
+  for (let i = 0; i < UPLOAD_STEPS.length; i += 1) {
+    const step = UPLOAD_STEPS[i];
+    let stateClass = "state-pending";
+    if (status === "error") {
+      if (i <= currentIdx) {
+        stateClass = "state-error";
+      }
+    } else if (i < currentIdx) {
+      stateClass = "state-done";
+    } else if (i === currentIdx) {
+      stateClass = status === "success" ? "state-done" : "state-active";
+    } else if (status === "success") {
+      stateClass = "state-done";
+    }
+
+    const card = document.createElement("div");
+    card.className = `step ${stateClass}`;
+    card.innerHTML = `
+      <div class="step-title">
+        <strong>${step.title}</strong>
+        <span class="muted">#${i + 1}</span>
+      </div>
+      <small>${step.hint}</small>
+    `;
+    uploadStepsEl.appendChild(card);
+  }
+}
+
+async function pollUploadJob(jobId) {
+  try {
+    const res = await fetch(`/api/jobs/${jobId}`);
+    const data = await res.json();
+    if (!data.ok || !data.job) {
+      throw new Error(data.error || "job not found");
+    }
+
+    const job = data.job;
+    const jobStatus = job.status || "running";
+    const stage = job.stage || "starting";
+
+    if (jobStatus === "running") {
+      setStatus(uploadStatusEl, "running", stage.replaceAll("_", " "));
+      renderUploadSteps(stage, "running");
+    } else if (jobStatus === "success") {
+      setStatus(uploadStatusEl, "success", "success");
+      renderUploadSteps(stage === "done" ? "done" : stage, "success");
+    } else {
+      setStatus(uploadStatusEl, "error", "error");
+      renderUploadSteps(stage, "error");
+    }
+
+    // Keep the bar at 100% once the file upload is finished.
+    setUploadProgress(100, null, null, "processing");
+
+    const header = [
+      `job_id: ${job.id}`,
+      `status: ${job.status}`,
+      `stage: ${job.stage}`,
+      `world_name: ${(job.meta || {}).world_name || "-"}`,
+      `exit_code: ${job.exit_code ?? "-"}`,
+      `duration_seconds: ${job.duration_seconds ?? "-"}`,
+      "",
+      "log (tail):",
+    ];
+    const lines = header.concat(job.log || []);
+    outputEl.textContent = lines.join("\n");
+
+    if (jobStatus !== "running") {
+      window.clearInterval(state.uploadPollTimer);
+      state.uploadPollTimer = null;
+      state.currentUploadJobId = null;
+      document.getElementById("createWorld").disabled = false;
+      document.getElementById("uploadWorld").disabled = false;
+      setStatus(runStatusEl, jobStatus === "success" ? "success" : "error", jobStatus);
+      await fetchManagement();
+    }
+  } catch (err) {
+    setStatus(uploadStatusEl, "error", "error");
+    outputEl.textContent = `Job polling failed: ${err}`;
+    window.clearInterval(state.uploadPollTimer);
+    state.uploadPollTimer = null;
+    state.currentUploadJobId = null;
+    document.getElementById("createWorld").disabled = false;
+    document.getElementById("uploadWorld").disabled = false;
+    setStatus(runStatusEl, "error", "error");
+  }
+}
+
+function startUploadJobPolling(jobId) {
+  if (state.uploadPollTimer) {
+    window.clearInterval(state.uploadPollTimer);
+  }
+  state.currentUploadJobId = jobId;
+  pollUploadJob(jobId);
+  state.uploadPollTimer = window.setInterval(() => pollUploadJob(jobId), 1200);
 }
 
 function bindChoiceGroup(rootId, key) {
@@ -213,46 +376,66 @@ async function uploadWorldFile() {
   form.append("world_name", worldName);
 
   setStatus(runStatusEl, "running", "running");
-  outputEl.textContent = "Uploading world and applying to Terraria deployment...";
+  setStatus(uploadStatusEl, "running", "uploading");
+  setUploadProgress(0, 0, file.size, "uploading");
+  renderUploadSteps("uploaded", "running");
+  outputEl.textContent = "Uploading world to the UI pod...";
   document.getElementById("createWorld").disabled = true;
   document.getElementById("uploadWorld").disabled = true;
 
-  try {
-    const response = await fetch("/api/upload-world", {
-      method: "POST",
-      body: form,
-    });
-    const result = await response.json();
+  if (state.uploadPollTimer) {
+    window.clearInterval(state.uploadPollTimer);
+    state.uploadPollTimer = null;
+  }
 
-    const lines = [
-      `ok: ${result.ok}`,
-      `exit_code: ${result.exit_code}`,
-      `world_name: ${result.world_name || worldName}`,
-      `bytes: ${result.bytes ?? "-"}`,
-      `duration_seconds: ${result.duration_seconds}`,
-      "",
-      "command:",
-      stringifyCommand(result.command),
-      "",
-      "output:",
-      result.output || "(no output)",
-    ];
+  await new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload-world", true);
+    xhr.responseType = "json";
 
-    outputEl.textContent = lines.join("\n");
-    setStatus(runStatusEl, result.ok ? "success" : "error", result.ok ? "success" : "error");
-    if (result.ok) {
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) {
+        setUploadProgress(0, event.loaded, file.size, "uploading");
+        return;
+      }
+      const pct = Math.round((event.loaded / event.total) * 100);
+      setUploadProgress(pct, event.loaded, event.total, "uploading");
+      setStatus(uploadStatusEl, "running", pct >= 100 ? "processing" : "uploading");
+    };
+
+    xhr.onload = () => {
+      const okHttp = xhr.status >= 200 && xhr.status < 300;
+      const result = xhr.response || {};
+      if (!okHttp || !result.ok) {
+        outputEl.textContent = `Upload failed: ${result.error || xhr.statusText || xhr.status}`;
+        setStatus(runStatusEl, "error", "error");
+        setStatus(uploadStatusEl, "error", "error");
+        document.getElementById("createWorld").disabled = false;
+        document.getElementById("uploadWorld").disabled = false;
+        resolve();
+        return;
+      }
+
+      setUploadProgress(100, file.size, file.size, "processing");
+      outputEl.textContent = `Upload received. Starting in-cluster job...\njob_id: ${result.job_id}`;
       worldNameEl.value = result.world_name || worldNameEl.value;
       worldFileEl.value = "";
-    }
 
-    await fetchManagement();
-  } catch (error) {
-    outputEl.textContent = `Upload failed: ${error}`;
-    setStatus(runStatusEl, "error", "error");
-  } finally {
-    document.getElementById("createWorld").disabled = false;
-    document.getElementById("uploadWorld").disabled = false;
-  }
+      startUploadJobPolling(result.job_id);
+      resolve();
+    };
+
+    xhr.onerror = () => {
+      outputEl.textContent = "Upload failed: network error";
+      setStatus(runStatusEl, "error", "error");
+      setStatus(uploadStatusEl, "error", "error");
+      document.getElementById("createWorld").disabled = false;
+      document.getElementById("uploadWorld").disabled = false;
+      resolve();
+    };
+
+    xhr.send(form);
+  });
 }
 
 function metricValue(value) {
@@ -461,6 +644,9 @@ function boot() {
 
   setStatus(runStatusEl, "idle", "idle");
   setStatus(mgmtStatusEl, "idle", "idle");
+  setStatus(uploadStatusEl, "idle", "idle");
+  setUploadProgress(0, 0, null, "uploading");
+  renderUploadSteps("", "running");
 
   loadSeeds()
     .then(fetchManagement)
