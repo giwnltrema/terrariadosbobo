@@ -82,11 +82,12 @@ spec:
               i=0
               while [ "$i" -lt 10 ]; do
                 if tailscale --socket=/var/run/tailscale/tailscaled.sock up \
-                  --authkey="${TS_AUTHKEY}" \
+                  --auth-key="${TS_AUTHKEY}" \
                   --hostname="${TS_HOSTNAME}" \
                   --accept-dns=false \
+                  --accept-risk=all \
                   --reset \
-                  --yes; then
+                  ; then
                   break
                 fi
                 i=$((i+1))
