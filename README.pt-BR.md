@@ -36,6 +36,8 @@ Stack local estilo producao para servidor de Terraria com observabilidade, backu
 - [Observabilidade](#observabilidade)
 - [Argo CD](#argo-cd)
 - [Terraform vs Argo CD](#terraform-vs-argo-cd)
+- [Deploy em cloud (AWS, GCP, OCI)](#deploy-em-cloud-aws-gcp-oci)
+- [Armazenamento externo de mundo e backups](#armazenamento-externo-de-mundo-e-backups)
 - [Estrutura do repositorio](#estrutura-do-repositorio)
 - [Troubleshooting](#troubleshooting)
 - [Destroy](#destroy)
@@ -360,6 +362,61 @@ Modelo recomendado neste repositorio hoje:
 1. Terraform para bootstrap e evolucao da base.
 2. Argo CD para reconciliar continuamente os manifests/apps GitOps.
 3. Se quiser modelo estrito "apps so via Argo", migrar em fases (recurso por recurso) e depois remover ownership no Terraform para evitar ownership duplo.
+
+## Deploy em cloud (AWS, GCP, OCI)
+
+Este repositorio pode sair do Docker Desktop local para Kubernetes gerenciado mantendo a mesma camada GitOps (`argocd/apps/*`).
+
+Opcoes alvo:
+
+- AWS: EKS + EBS CSI + (opcional) ingress NLB/ALB
+- GCP: GKE + GCE PD CSI + (opcional) ingress GCLB
+- OCI: OKE + OCI Block Volume CSI + (opcional) OCI Load Balancer
+
+Separacao recomendada:
+
+1. Terraform cuida da plataforma/infra (cluster, node pools, storage classes, rede, DNS/TLS, bootstrap do Argo CD).
+2. Argo CD cuida da camada de apps (Terraria, monitoring add-ons, world UI).
+
+Checklist pratico de migracao:
+
+1. Provisionar cluster gerenciado e validar contexto `kubectl`.
+2. Ajustar storage class real no lugar de `hostpath`.
+3. Expor services via `LoadBalancer` ou ingress (em vez de NodePort local).
+4. Subir Argo CD e sincronizar `argocd/apps/bootstrap`.
+5. Validar health no Argo e dashboards no Grafana antes do cutover.
+
+Importante:
+
+- Um recurso deve ter apenas um owner (Terraform ou Argo), nunca os dois ao mesmo tempo.
+- Fazer migracao em fases para evitar drift e recriacao repetitiva.
+
+## Armazenamento externo de mundo e backups
+
+Sim, da para manter os mundos fora do cluster e ter backup automatico.
+
+Padrao recomendado (estilo producao):
+
+1. Mundo ativo no PVC (`terraria-config`) para I/O de runtime.
+2. Backup agendado do PVC para storage externo:
+   - AWS S3, GCS, OCI Object Storage (recomendado)
+   - Google Drive com `rclone` (funciona, mas menos ideal para automacao de longo prazo)
+3. Fluxo de restore que baixa um mundo escolhido do storage remoto para o PVC antes do startup.
+
+Notas operacionais:
+
+- Para trocar/restaurar mundo, escalar `terraria-server` para `0`, restaurar arquivo e depois voltar para `1`.
+- Definir retencao (`N` backups) e criptografia em repouso no storage remoto.
+- Expor metrica/alerta de sucesso de backup no Prometheus.
+
+Pacote "subir do zero" (sem ferramentas locais instaladas) tambem e possivel:
+
+1. Provisionamento com cloud-init/Ansible/Terraform para instalar dependencias.
+2. Instalar Argo CD e sincronizar este repo automaticamente.
+3. Puxar mundo inicial do storage remoto no bootstrap.
+4. Manter backup continuo para storage remoto.
+
+Esse modelo deixa o ambiente reproduzivel em maquina/VM nova com minimo de passo manual.
 
 ## Estrutura do repositorio
 

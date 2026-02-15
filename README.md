@@ -36,6 +36,8 @@ Production-style local stack for a Terraria server with observability, backups, 
 - [Observability](#observability)
 - [Argo CD](#argo-cd)
 - [Terraform vs Argo CD](#terraform-vs-argo-cd)
+- [Cloud deployment (AWS, GCP, OCI)](#cloud-deployment-aws-gcp-oci)
+- [External world storage and backups](#external-world-storage-and-backups)
 - [Repository structure](#repository-structure)
 - [Troubleshooting](#troubleshooting)
 - [Destroy](#destroy)
@@ -360,6 +362,61 @@ Recommended model for this repository right now:
 1. Use Terraform to bootstrap and update the base platform.
 2. Use Argo CD to continuously reconcile Git-managed applications/manifests.
 3. If you want a strict "Argo-only app layer", migrate in phases (resource-by-resource) and then remove Terraform ownership to avoid dual management.
+
+## Cloud deployment (AWS, GCP, OCI)
+
+This repository can be promoted from local Docker Desktop to managed Kubernetes with the same GitOps app layer (`argocd/apps/*`).
+
+Target options:
+
+- AWS: EKS + EBS CSI + (optional) NLB/ALB ingress
+- GCP: GKE + GCE PD CSI + (optional) GCLB ingress
+- OCI: OKE + OCI Block Volume CSI + (optional) OCI Load Balancer
+
+Recommended split:
+
+1. Terraform manages platform/infrastructure (cluster, node pools, storage classes, networking, DNS/TLS, Argo CD bootstrap).
+2. Argo CD manages the app layer (Terraria, monitoring add-ons, world UI).
+
+Practical migration checklist:
+
+1. Provision managed K8s and confirm `kubectl` context.
+2. Set a valid storage class in your values/vars (instead of local `hostpath`).
+3. Expose services as `LoadBalancer` or ingress (instead of local-only NodePort) for public access.
+4. Bootstrap Argo CD and sync `argocd/apps/bootstrap`.
+5. Validate health in Argo and dashboards in Grafana before cutover.
+
+Important:
+
+- Keep one owner per resource (Terraform or Argo), not both.
+- Do migration in phases to avoid drift and repeated recreation.
+
+## External world storage and backups
+
+Yes, you can store world files outside the cluster and keep automatic backups.
+
+Recommended pattern (production-style):
+
+1. Keep active world on PVC (`terraria-config`) for runtime I/O.
+2. Add scheduled backup sync from PVC to object storage:
+   - AWS S3, GCS, OCI Object Storage (recommended)
+   - Google Drive via `rclone` (works, but less ideal for long-term server automation)
+3. Add restore workflow that pulls a selected world file from remote storage into PVC before startup.
+
+Operational notes:
+
+- For restore/swap world, scale `terraria-server` to `0` first, restore file, then scale back to `1`.
+- Keep retention policy (`N` backups) and encryption at rest in remote storage.
+- Track backup success with Prometheus metrics/alerts.
+
+Bootstrap from zero (no local tools installed) is also possible:
+
+1. Use cloud-init/Ansible/Terraform provisioning to install runtime dependencies.
+2. Install Argo CD and sync this repo automatically.
+3. Pull world from remote storage during initial bootstrap.
+4. Keep continuous scheduled backups to remote storage.
+
+That gives reproducible bring-up on a fresh machine/VM with minimal manual steps.
 
 ## Repository structure
 
