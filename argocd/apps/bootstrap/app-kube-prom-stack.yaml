@@ -37,7 +37,7 @@ spec:
               - name: "null"
                 webhook_configs: []
         grafana:
-          assertNoLeakedSecrets: false
+          assertNoLeakedSecrets: true
           adminUser: admin
           adminPassword: admin123
           defaultDashboardsEnabled: true
@@ -66,11 +66,23 @@ spec:
               label: grafana_datasource
               searchNamespace: monitoring
               defaultDatasourceEnabled: false
+          envFromSecrets:
+            - name: grafana-github-oauth
+              optional: true
           grafana.ini:
             server:
               root_url: "http://localhost:30030"
             auth:
               disable_login_form: false
+            auth.github:
+              enabled: $__env{GRAFANA_GITHUB_OAUTH_ENABLED}
+              allow_sign_up: true
+              client_id: $__env{GRAFANA_GITHUB_CLIENT_ID}
+              client_secret: $__env{GRAFANA_GITHUB_CLIENT_SECRET}
+              scopes: read:user,user:email,read:org
+              auth_url: https://github.com/login/oauth/authorize
+              token_url: https://github.com/login/oauth/access_token
+              api_url: https://api.github.com/user
             users:
               auto_assign_org_role: Admin
         kubeStateMetrics:
