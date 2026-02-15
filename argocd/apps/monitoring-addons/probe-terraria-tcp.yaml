@@ -9,7 +9,10 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   jobName: terraria-tcp-probe
-  interval: 30s
+  # Probing the Terraria game port creates real TCP connections that show up as
+  # "is connecting..." in server logs. Keep it low frequency to avoid noise and
+  # reduce any chance of impacting gameplay connections.
+  interval: 5m
   module: tcp_connect
   prober:
     url: terraria-blackbox-exporter.monitoring.svc.cluster.local:9115
