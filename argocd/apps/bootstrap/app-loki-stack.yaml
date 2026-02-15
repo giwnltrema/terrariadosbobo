@@ -21,6 +21,7 @@ spec:
               - ReadWriteOnce
             size: 10Gi
           isDefault: false
+        isDefault: false
         promtail:
           enabled: true
         grafana:

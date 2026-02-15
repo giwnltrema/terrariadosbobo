@@ -41,6 +41,7 @@ resource "helm_release" "loki_stack" {
         }
         isDefault = false
       }
+      isDefault = false
       promtail = {
         enabled = true
       }
