@@ -232,6 +232,7 @@ Abra `http://127.0.0.1:8787` e crie mapas visualmente com:
 - seed manual
 - biblioteca de seeds especiais (multi-select)
 - maximo de players
+- upload de `.wld` (copia para PVC e ativa o mundo automaticamente)
 - painel em tempo real (pods, logs, mundo ativo, endpoints)
 - acoes rapidas (`start`, `stop`, `restart`, `set active world`)
 

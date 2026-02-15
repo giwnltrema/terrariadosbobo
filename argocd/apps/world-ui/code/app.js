@@ -9,6 +9,7 @@ const state = {
 };
 
 const worldNameEl = document.getElementById("worldName");
+const worldFileEl = document.getElementById("worldFile");
 const manualSeedEl = document.getElementById("manualSeed");
 const maxPlayersEl = document.getElementById("maxPlayers");
 const serverPortEl = document.getElementById("serverPort");
@@ -161,6 +162,7 @@ async function createWorld() {
   setStatus(runStatusEl, "running", "running");
   outputEl.textContent = "Running upload-world script...";
   document.getElementById("createWorld").disabled = true;
+  document.getElementById("uploadWorld").disabled = true;
 
   try {
     const response = await fetch("/api/create-world", {
@@ -193,6 +195,63 @@ async function createWorld() {
     setStatus(runStatusEl, "error", "error");
   } finally {
     document.getElementById("createWorld").disabled = false;
+    document.getElementById("uploadWorld").disabled = false;
+  }
+}
+
+async function uploadWorldFile() {
+  const file = (worldFileEl.files || [])[0];
+  if (!file) {
+    outputEl.textContent = "Select a .wld file before uploading.";
+    setStatus(runStatusEl, "error", "error");
+    return;
+  }
+
+  const worldName = worldNameEl.value.trim() || file.name;
+  const form = new FormData();
+  form.append("world_file", file, file.name);
+  form.append("world_name", worldName);
+
+  setStatus(runStatusEl, "running", "running");
+  outputEl.textContent = "Uploading world and applying to Terraria deployment...";
+  document.getElementById("createWorld").disabled = true;
+  document.getElementById("uploadWorld").disabled = true;
+
+  try {
+    const response = await fetch("/api/upload-world", {
+      method: "POST",
+      body: form,
+    });
+    const result = await response.json();
+
+    const lines = [
+      `ok: ${result.ok}`,
+      `exit_code: ${result.exit_code}`,
+      `world_name: ${result.world_name || worldName}`,
+      `bytes: ${result.bytes ?? "-"}`,
+      `duration_seconds: ${result.duration_seconds}`,
+      "",
+      "command:",
+      stringifyCommand(result.command),
+      "",
+      "output:",
+      result.output || "(no output)",
+    ];
+
+    outputEl.textContent = lines.join("\n");
+    setStatus(runStatusEl, result.ok ? "success" : "error", result.ok ? "success" : "error");
+    if (result.ok) {
+      worldNameEl.value = result.world_name || worldNameEl.value;
+      worldFileEl.value = "";
+    }
+
+    await fetchManagement();
+  } catch (error) {
+    outputEl.textContent = `Upload failed: ${error}`;
+    setStatus(runStatusEl, "error", "error");
+  } finally {
+    document.getElementById("createWorld").disabled = false;
+    document.getElementById("uploadWorld").disabled = false;
   }
 }
 
@@ -394,6 +453,7 @@ function boot() {
   });
 
   document.getElementById("createWorld").addEventListener("click", createWorld);
+  document.getElementById("uploadWorld").addEventListener("click", uploadWorldFile);
   document.getElementById("refreshMgmt").addEventListener("click", fetchManagement);
   document.getElementById("startServer").addEventListener("click", () => serverAction("start"));
   document.getElementById("stopServer").addEventListener("click", () => serverAction("stop"));

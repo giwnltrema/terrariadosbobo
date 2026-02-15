@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+import cgi
 import json
 import os
 import subprocess
+import tempfile
 import time
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -316,6 +318,100 @@ def build_world_command(payload: Dict) -> Tuple[List[str], Dict]:
     return command, meta
 
 
+def build_upload_world_command(world_file: Path, world_name: str) -> List[str]:
+    if os.name == "nt":
+        script_path = REPO_ROOT / "scripts" / "upload-world.ps1"
+        return [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script_path),
+            "-WorldFile",
+            str(world_file),
+            "-WorldName",
+            world_name,
+        ]
+
+    script_path = REPO_ROOT / "scripts" / "upload-world.sh"
+    return [
+        "bash",
+        str(script_path),
+        "--world-file",
+        str(world_file),
+        "--world-name",
+        world_name,
+    ]
+
+
+def sanitize_world_name(world_name: str, fallback_name: str) -> str:
+    candidate = (world_name or "").strip()
+    if not candidate:
+        candidate = fallback_name
+    candidate = os.path.basename(candidate)
+    if not candidate.endswith(".wld"):
+        candidate += ".wld"
+    return candidate
+
+
+def handle_world_upload(content_type: str, headers, body_stream) -> Dict:
+    content_type = content_type or ""
+    if "multipart/form-data" not in content_type:
+        return {"ok": False, "error": "Content-Type must be multipart/form-data"}
+
+    content_length = headers.get("Content-Length", "0")
+    form = cgi.FieldStorage(
+        fp=body_stream,
+        headers=headers,
+        environ={
+            "REQUEST_METHOD": "POST",
+            "CONTENT_TYPE": content_type,
+            "CONTENT_LENGTH": content_length,
+        },
+        keep_blank_values=True,
+    )
+
+    file_item = form["world_file"] if "world_file" in form else None
+    if file_item is None or not getattr(file_item, "file", None):
+        return {"ok": False, "error": "world_file is required"}
+
+    uploaded_name = os.path.basename(getattr(file_item, "filename", "") or "")
+    manual_name = form.getfirst("world_name", "")
+    world_name = sanitize_world_name(manual_name, uploaded_name or "uploaded-world.wld")
+
+    tmp_dir = Path(tempfile.mkdtemp(prefix="terraria-world-upload-"))
+    tmp_file = tmp_dir / world_name
+
+    try:
+        with tmp_file.open("wb") as target:
+            while True:
+                chunk = file_item.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                target.write(chunk)
+
+        if tmp_file.stat().st_size == 0:
+            return {"ok": False, "error": "Uploaded file is empty"}
+
+        command = build_upload_world_command(tmp_file, world_name)
+        result = run_subprocess(command, timeout=3600)
+        return {
+            "ok": result["ok"],
+            "world_name": world_name,
+            "bytes": tmp_file.stat().st_size,
+            "command": command,
+            **result,
+        }
+    finally:
+        try:
+            if tmp_file.exists():
+                tmp_file.unlink()
+            tmp_dir.rmdir()
+        except OSError:
+            pass
+
+
 def get_terraria_pods(namespace: str, app_label: str) -> List[Dict]:
     data, err = kubectl_json(["-n", namespace, "get", "pods", "-l", f"app={app_label}"])
     if err or not data:
@@ -610,6 +706,11 @@ class WorldCreatorHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+
+        if parsed.path == "/api/upload-world":
+            content_type = self.headers.get("Content-Type", "")
+            result = handle_world_upload(content_type, self.headers, self.rfile)
+            return self.send_json(200 if result.get("ok") else 500, result)
 
         if parsed.path == "/api/create-world":
             payload, err = self.parse_json_body()

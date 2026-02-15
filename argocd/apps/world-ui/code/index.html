@@ -91,12 +91,24 @@
         </label>
       </div>
 
+      <div class="row two">
+        <label class="field">
+          <span>Upload existing .wld</span>
+          <input id="worldFile" type="file" accept=".wld">
+        </label>
+        <div class="field">
+          <span>Upload flow</span>
+          <p class="seed-summary">Copies file to PVC, sets active world, and rolls deployment.</p>
+        </div>
+      </div>
+
       <div class="seed-preview">
         <span>Resolved Seed:</span>
         <strong id="resolvedSeed">(random)</strong>
       </div>
 
       <div class="actions">
+        <button id="uploadWorld" class="secondary">Upload .wld to PVC</button>
         <button id="createWorld" class="primary">Create world on PVC</button>
       </div>
     </section>

@@ -232,6 +232,7 @@ Open `http://127.0.0.1:8787` and create worlds visually with:
 - manual seed
 - special seed library (multi-select)
 - max players
+- `.wld` upload (copies to PVC and activates world automatically)
 - live runtime panel (pods, logs, active world, endpoints)
 - one-click server actions (`start`, `stop`, `restart`, `set active world`)
 
