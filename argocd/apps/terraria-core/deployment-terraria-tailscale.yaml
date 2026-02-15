@@ -18,12 +18,30 @@ spec:
       # This pod creates a Tailscale node inside the cluster and forwards raw TCP
       # traffic from tailnet:7777 to the in-cluster service terraria-service:7777.
       #
+      # Note: `tailscale serve --tcp` expects a local target (localhost). We use a
+      # small TCP forwarder sidecar to make the in-cluster Service reachable on
+      # localhost inside the Pod network namespace.
+      #
       # It requires an auth key provided via secret `terraria-tailscale-auth`.
       # Example:
       #   kubectl -n terraria create secret generic terraria-tailscale-auth \
       #     --from-literal=TS_AUTHKEY=tskey-auth-... \
       #     --from-literal=TS_HOSTNAME=terrariadosbobo-terraria
       containers:
+        - name: tcp-forward
+          image: alpine/socat:1.8.0.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-d"
+            - "-d"
+            - "TCP-LISTEN:7777,fork,reuseaddr"
+            - "TCP:terraria-service.terraria.svc.cluster.local:7777"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
         - name: tailscale
           image: ghcr.io/tailscale/tailscale:v1.94.2
           imagePullPolicy: IfNotPresent
@@ -100,11 +118,11 @@ spec:
               fi
 
               echo "[terraria-tailscale] tailnet IPv4: $(tailscale --socket=/var/run/tailscale/tailscaled.sock ip -4)"
-              echo "[terraria-tailscale] forwarding TCP 7777 -> terraria-service.terraria.svc.cluster.local:7777"
+              echo "[terraria-tailscale] forwarding TCP 7777 -> 127.0.0.1:7777 -> terraria-service.terraria.svc.cluster.local:7777"
 
               # Keep serve in foreground so the container stays healthy.
               tailscale --socket=/var/run/tailscale/tailscaled.sock serve \
-                --tcp=7777 terraria-service.terraria.svc.cluster.local:7777
+                --tcp=7777 tcp://127.0.0.1:7777
       volumes:
         - name: state
           persistentVolumeClaim:
