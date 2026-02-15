@@ -39,8 +39,8 @@ resource "helm_release" "loki_stack" {
           accessModes      = ["ReadWriteOnce"]
           size             = var.loki_persistence_size
         }
+        isDefault = false
       }
-      isDefault = false
       promtail = {
         enabled = true
       }
