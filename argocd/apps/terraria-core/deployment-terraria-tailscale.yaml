@@ -60,27 +60,43 @@ spec:
 
               echo "[terraria-tailscale] starting tailscaled..."
               tailscaled \
+                --tun=userspace-networking \
                 --state=/var/lib/tailscale/tailscaled.state \
                 --socket=/var/run/tailscale/tailscaled.sock &
 
-              # Wait for daemon socket
+              # Wait for daemon socket.
               i=0
-              until tailscale --socket=/var/run/tailscale/tailscaled.sock status >/dev/null 2>&1; do
-                i=$((i+1))
-                if [ "$i" -gt 60 ]; then
-                  echo "[terraria-tailscale] tailscaled did not become ready in time"
-                  exit 1
+              while [ "$i" -lt 60 ]; do
+                if [ -S /var/run/tailscale/tailscaled.sock ]; then
+                  break
                 fi
+                i=$((i+1))
                 sleep 1
               done
+              if [ ! -S /var/run/tailscale/tailscaled.sock ]; then
+                echo "[terraria-tailscale] tailscaled socket did not appear in time"
+                exit 1
+              fi
 
               echo "[terraria-tailscale] bringing node up..."
-              tailscale --socket=/var/run/tailscale/tailscaled.sock up \
-                --authkey="${TS_AUTHKEY}" \
-                --hostname="${TS_HOSTNAME}" \
-                --accept-dns=false \
-                --reset \
-                --yes
+              i=0
+              while [ "$i" -lt 10 ]; do
+                if tailscale --socket=/var/run/tailscale/tailscaled.sock up \
+                  --authkey="${TS_AUTHKEY}" \
+                  --hostname="${TS_HOSTNAME}" \
+                  --accept-dns=false \
+                  --reset \
+                  --yes; then
+                  break
+                fi
+                i=$((i+1))
+                sleep 2
+              done
+              if [ "$i" -ge 10 ]; then
+                echo "[terraria-tailscale] tailscale up failed after retries"
+                tailscale --socket=/var/run/tailscale/tailscaled.sock status || true
+                exit 1
+              fi
 
               echo "[terraria-tailscale] tailnet IPv4: $(tailscale --socket=/var/run/tailscale/tailscaled.sock ip -4)"
               echo "[terraria-tailscale] forwarding TCP 7777 -> terraria-service.terraria.svc.cluster.local:7777"
