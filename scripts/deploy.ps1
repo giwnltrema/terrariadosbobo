@@ -226,6 +226,7 @@ function Sync-WorldUiGitOpsPayload {
     "world-ui/static/styles.css" = "styles.css"
     "world-ui/static/app.js"     = "app.js"
     "scripts/upload-world.sh"    = "upload-world.sh"
+    "exporter/exporter.py"       = "../terraria-core/code/exporter.py"
   }
 
   foreach ($sourceRel in $map.Keys) {
@@ -233,7 +234,12 @@ function Sync-WorldUiGitOpsPayload {
     if (-not (Test-Path $sourcePath)) {
       throw "Arquivo esperado nao encontrado para payload GitOps: $sourceRel"
     }
-    Copy-Item -Path $sourcePath -Destination (Join-Path $destDir $map[$sourceRel]) -Force
+    $destinationPath = Join-Path $destDir $map[$sourceRel]
+    $destinationDir = Split-Path -Parent $destinationPath
+    if (-not (Test-Path $destinationDir)) {
+      New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+    }
+    Copy-Item -Path $sourcePath -Destination $destinationPath -Force
   }
 
   Write-Host "[world-ui] Payload GitOps sincronizado em argocd/apps/world-ui/code"

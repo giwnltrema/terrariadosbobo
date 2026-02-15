@@ -186,20 +186,23 @@ sync_world_ui_gitops_payload() {
     "world-ui/static/styles.css:styles.css"
     "world-ui/static/app.js:app.js"
     "scripts/upload-world.sh:upload-world.sh"
+    "exporter/exporter.py:../terraria-core/code/exporter.py"
   )
 
-  local pair src_rel dst_name src_path
+  local pair src_rel dst_name src_path target_path
   for pair in "${files[@]}"; do
     src_rel="${pair%%:*}"
     dst_name="${pair##*:}"
     src_path="$repo_root/$src_rel"
+    target_path="$dest_dir/$dst_name"
 
     if [[ ! -f "$src_path" ]]; then
       echo "Arquivo esperado nao encontrado para payload GitOps: $src_rel" >&2
       exit 1
     fi
 
-    cp "$src_path" "$dest_dir/$dst_name"
+    mkdir -p "$(dirname "$target_path")"
+    cp "$src_path" "$target_path"
   done
 
   echo "[world-ui] Payload GitOps sincronizado em argocd/apps/world-ui/code"

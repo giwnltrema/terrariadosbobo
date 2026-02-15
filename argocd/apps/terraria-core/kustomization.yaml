@@ -17,7 +17,7 @@ resources:
 configMapGenerator:
   - name: terraria-exporter-code
     files:
-      - exporter.py=../../../exporter/exporter.py
+      - exporter.py=code/exporter.py
 
 generatorOptions:
   disableNameSuffixHash: true
