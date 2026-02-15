@@ -1,0 +1,48 @@
+{
+  "title": "Terraria Logs Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "style": "dark",
+  "tags": ["terraria", "logs", "loki"],
+  "time": { "from": "now-6h", "to": "now" },
+  "annotations": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "query": "label_values(namespace)", "refId": "LokiNamespaceVar" },
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "pod",
+        "label": "Pod",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "query": "label_values({namespace=~\"$namespace\"}, pod)", "refId": "LokiPodVar" },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "logs",
+      "title": "Filtered Logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "expr": "{namespace=~\"$namespace\", pod=~\"$pod\"}", "queryType": "range" }
+      ],
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 0 }
+    }
+  ]
+}

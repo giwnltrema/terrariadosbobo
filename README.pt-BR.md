@@ -34,7 +34,8 @@ Stack local estilo producao para servidor de Terraria com observabilidade, backu
 - [Screenshots](#screenshots)
 - [Gerenciamento de mundo](#gerenciamento-de-mundo)
 - [Observabilidade](#observabilidade)
-- [Argo CD](#argo-cd)`r`n- [Terraform vs Argo CD](#terraform-vs-argo-cd)
+- [Argo CD](#argo-cd)
+- [Terraform vs Argo CD](#terraform-vs-argo-cd)
 - [Estrutura do repositorio](#estrutura-do-repositorio)
 - [Troubleshooting](#troubleshooting)
 - [Destroy](#destroy)
@@ -43,7 +44,7 @@ Stack local estilo producao para servidor de Terraria com observabilidade, backu
 
 | Camada | Componentes |
 |---|---|
-| Jogo | `terraria-server` (padrao `ghcr.io/beardedio/terraria:latest`, configuravel) + PVC `terraria-config` |
+| Jogo | `terraria-server` (`ghcr.io/beardedio/terraria:tshock-latest`) + PVC `terraria-config` |
 | Metricas | Stack Prometheus Operator (`kube-prometheus-stack`), `kube-state-metrics`, node exporter |
 | Metricas de gameplay | `terraria-exporter` custom (API + fallback parser de `.wld`) |
 | Disponibilidade | Blackbox exporter + `Probe` TCP do servidor |
@@ -173,6 +174,7 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 | Grafana | `http://localhost:30030` |
 | Prometheus | `http://localhost:30090` |
 | Argo CD | `http://localhost:30080` |
+| World UI (app Argo) | `http://localhost:30878` |
 | Servidor Terraria | `SEU_IP_LAN:30777` |
 
 ## Matriz de comandos cross-platform
@@ -182,7 +184,8 @@ bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 
 | Subir stack | `./scripts/deploy.ps1` | `bash ./scripts/deploy.sh` |
 | Subir com bootstrap de mundo | `./scripts/deploy.ps1 -WorldName "test.wld" -WorldSize large -MaxPlayers 16 -Difficulty expert -Seed "seed-123"` | `bash ./scripts/deploy.sh --world-name test.wld --world-size large --max-players 16 --difficulty expert --seed seed-123` |
 | Upload de mundo | `./scripts/upload-world.ps1 -WorldFile "C:/caminho/map.wld"` | `bash ./scripts/upload-world.sh --world-file /c/caminho/map.wld` |
-| UI visual de criacao de mundo | `./scripts/world-creator-ui.ps1` | `bash ./scripts/world-creator-ui.sh` |
+| UI de criacao + gerenciamento (local) | `./scripts/world-creator-ui.ps1` | `bash ./scripts/world-creator-ui.sh` |
+| UI de criacao + gerenciamento (no cluster) | `./scripts/world-creator-ui.ps1 -K8s` | `bash ./scripts/world-creator-ui.sh --k8s` |
 | Criar mundo se nao existir | `./scripts/upload-world.ps1 -WorldName "test.wld"` | `bash ./scripts/upload-world.sh --world-name test.wld` |
 | Ver pods | `kubectl get pods -A` | `kubectl get pods -A` |
 | Logs do Terraria | `kubectl -n terraria logs deploy/terraria-server --tail=200` | `kubectl -n terraria logs deploy/terraria-server --tail=200` |
@@ -208,7 +211,7 @@ Guia de captura: `docs/screenshots/README.md`
 
 ## Gerenciamento de mundo
 
-UI visual tematica Terraria para criacao de mundo + gerenciamento do servidor (app web local):
+Console tematico de Terraria para criacao de mundo e gerenciamento do servidor:
 
 ```powershell
 ./scripts/world-creator-ui.ps1
@@ -226,7 +229,29 @@ Abra `http://127.0.0.1:8787` e crie mapas visualmente com:
 - tipo de evil
 - seed manual
 - biblioteca de seeds especiais (multi-select)
-- maximo de players`r`n- snapshot de runtime (pods, service, mundo ativo, logs, players online por metricas)`r`n- acoes de servidor (start, stop, restart do deployment)
+- maximo de players
+- painel em tempo real (pods, logs, mundo ativo, endpoints)
+- acoes rapidas (`start`, `stop`, `restart`, `set active world`)
+
+Rodar a UI dentro do Kubernetes (NodePort `30878`) em vez de processo local:
+
+```powershell
+./scripts/world-creator-ui.ps1 -K8s
+```
+
+```bash
+bash ./scripts/world-creator-ui.sh --k8s
+```
+
+Remover UI em-cluster:
+
+```powershell
+./scripts/world-creator-ui.ps1 -K8s -K8sDelete
+```
+
+```bash
+bash ./scripts/world-creator-ui.sh --k8s --k8s-delete
+```
 
 Ao selecionar multiplas seeds especiais, a UI resolve para `get fixed boi` (modo Zenith), seguindo o comportamento de combinacao.
 
@@ -267,6 +292,13 @@ Parametros de criacao suportados:
 - `Terraria Gameplay Overview`
 - `Terraria Logs Overview`
 
+O exporter de gameplay agora trabalha com duas fontes:
+
+- Metricas runtime: API/logs (`terraria_exporter_source_up`, `terraria_world_runtime_up`, `terraria_players_online`)
+- Metricas snapshot: parser do `.wld` (`terraria_world_*_total`, `terraria_world_snapshot_age_seconds`)
+
+Assim o dashboard nao confunde valor congelado de snapshot com estado ao vivo.
+
 ### PromQL util para checagem rapida
 
 ```promql
@@ -300,14 +332,45 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 Notas:
 
 - A Application bootstrap so e criada se `argocd_app_repo_url` estiver configurado.
+- O bootstrap em `argocd/apps/bootstrap` agora orquestra apps filhas (`kube-prom-stack`, `loki-stack`, `terraria-core`, `monitoring-addons`, `world-ui`).
 - Os scripts de deploy detectam `remote.origin.url` automaticamente por padrao.
+- Os scripts de deploy tambem sincronizam o codigo da world-ui para `argocd/apps/world-ui/code` antes do `terraform apply`.
+- Os scripts de deploy tambem sincronizam `argocd/apps/bootstrap/repo-settings.yaml` para as apps filhas apontarem para o clone do proprio usuario.
 
-## Terraform vs Argo CD`r`n`r`nModelo recomendado atual neste repositorio: **hibrido**.`r`n`r`n1. **Terraform** faz bootstrap da base (namespaces, stack Helm, CRDs, instalacao do Argo CD).`r`n2. **Argo CD** reconcilia continuamente os manifests definidos no Git.`r`n`r`nPontos importantes:`r`n`r`n- Ir para Argo **nao move o state do Terraform** para o Argo.`r`n- O state continua sendo state do Terraform (local ou backend remoto, se voce configurar).`r`n- O cluster Kubernetes continua o **mesmo cluster** (`docker-desktop` local).`r`n- O que muda e o dono da reconciliacao dos recursos de app (apply manual/Terraform vs sync GitOps do Argo).`r`n`r`nPara migracao segura para GitOps completo, faca em fases e nao em big-bang.`r`n`r`n## Estrutura do repositorio
+Status/operacao Argo:
+
+```bash
+kubectl -n argocd get applications
+kubectl -n argocd describe application terrariadosbobo-terraria-core
+kubectl -n argocd describe application terrariadosbobo-monitoring-addons
+```
+
+## Terraform vs Argo CD
+
+Resumo rapido:
+
+- **O cluster Kubernetes continua o mesmo** (no seu caso, `docker-desktop`).
+- **O state do Terraform nao vai para o Argo CD**. Argo nao usa state do Terraform.
+- Terraform e Argo atuam em camadas diferentes:
+  - Terraform: camada de bootstrap/infra (providers, recursos base, definicoes de Helm, wiring de secrets).
+  - Argo CD: reconciliacao continua do estado desejado vindo do Git (camada GitOps de apps).
+
+Modelo recomendado neste repositorio hoje:
+
+1. Terraform para bootstrap e evolucao da base.
+2. Argo CD para reconciliar continuamente os manifests/apps GitOps.
+3. Se quiser modelo estrito "apps so via Argo", migrar em fases (recurso por recurso) e depois remover ownership no Terraform para evitar ownership duplo.
+
+## Estrutura do repositorio
 
 ```text
 .
 |-- argocd/
-|   `-- apps/bootstrap/
+|   `-- apps/
+|       |-- bootstrap/
+|       |-- monitoring-addons/
+|       |-- terraria-core/
+|       `-- world-ui/
 |-- exporter/
 |   `-- exporter.py
 |-- scripts/
@@ -359,6 +422,4 @@ kubectl -n monitoring get servicemonitors,prometheusrules,probes
 ```bash
 terraform -chdir=terraform destroy -auto-approve
 ```
-
-
 

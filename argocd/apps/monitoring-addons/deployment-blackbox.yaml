@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terraria-blackbox-exporter
+  namespace: monitoring
+  labels:
+    app: terraria-blackbox-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terraria-blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app: terraria-blackbox-exporter
+    spec:
+      containers:
+        - name: blackbox-exporter
+          image: prom/blackbox-exporter:v0.25.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config.file=/etc/blackbox/blackbox.yml
+          ports:
+            - containerPort: 9115
+              name: http
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/blackbox/blackbox.yml
+              name: blackbox-config
+              subPath: blackbox.yml
+      volumes:
+        - name: blackbox-config
+          configMap:
+            name: terraria-blackbox-config

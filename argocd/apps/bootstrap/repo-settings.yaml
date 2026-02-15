@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: terrariadosbobo-repo-settings
+  namespace: terrariadosbobo-gitops
+data:
+  repoURL: https://github.com/giwnltrema/terrariadosbobo.git

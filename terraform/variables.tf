@@ -31,7 +31,7 @@ variable "argocd_namespace" {
 variable "terraria_image" {
   description = "Imagem do servidor Terraria"
   type        = string
-  default     = "ghcr.io/beardedio/terraria:latest"
+  default     = "ghcr.io/beardedio/terraria:tshock-latest"
 }
 
 variable "world_file" {
@@ -184,6 +184,12 @@ variable "terraria_node_port" {
   }
 }
 
+variable "terraria_connect_host" {
+  description = "Host/IP exibido no output de conexao dos jogadores (vazio = hint generico)"
+  type        = string
+  default     = ""
+}
+
 variable "prometheus_node_port" {
   description = "NodePort da UI do Prometheus"
   type        = number
@@ -269,3 +275,22 @@ variable "argocd_app_path" {
   type        = string
   default     = "argocd/apps/bootstrap"
 }
+
+variable "argocd_world_ui_app_enabled" {
+  description = "Cria Application dedicada do Argo CD para a world-ui (normalmente desnecessario quando bootstrap app-of-apps esta habilitado)"
+  type        = bool
+  default     = false
+}
+
+variable "argocd_world_ui_app_name" {
+  description = "Nome da Application Argo CD para world-ui"
+  type        = string
+  default     = "terrariadosbobo-world-ui"
+}
+
+variable "argocd_world_ui_app_path" {
+  description = "Path GitOps da world-ui no repositorio"
+  type        = string
+  default     = "argocd/apps/world-ui"
+}
+

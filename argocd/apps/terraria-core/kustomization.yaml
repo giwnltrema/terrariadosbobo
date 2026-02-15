@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - pvc-terraria-config.yaml
+  - pvc-terraria-backups.yaml
+  - deployment-terraria-server.yaml
+  - service-terraria-server.yaml
+  - secret-terraria-api.yaml
+  - serviceaccount-terraria-exporter.yaml
+  - role-terraria-exporter-logs.yaml
+  - rolebinding-terraria-exporter-logs.yaml
+  - deployment-terraria-exporter.yaml
+  - service-terraria-exporter.yaml
+  - cronjob-terraria-world-backup.yaml
+
+configMapGenerator:
+  - name: terraria-exporter-code
+    files:
+      - exporter.py=../../../exporter/exporter.py
+
+generatorOptions:
+  disableNameSuffixHash: true

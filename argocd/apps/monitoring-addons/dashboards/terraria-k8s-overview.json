@@ -1,0 +1,67 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Terraria Pod Running",
+      "targets": [{ "expr": "max(kube_pod_status_phase{namespace=\"terraria\",pod=~\"terraria-server-.*\",phase=\"Running\"}) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Container Ready",
+      "targets": [{ "expr": "max(kube_pod_container_status_ready{namespace=\"terraria\",pod=~\"terraria-server-.*\",container=\"terraria\"}) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "TCP Reachability",
+      "targets": [{ "expr": "max(probe_success{job=\"terraria-tcp-probe\"}) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Exporter Up",
+      "targets": [{ "expr": "max(up{job=\"terraria-exporter\"}) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Deployment Replicas",
+      "targets": [
+        { "expr": "max(kube_deployment_status_replicas_available{namespace=\"terraria\",deployment=\"terraria-server\"}) or vector(0)", "legendFormat": "Available" },
+        { "expr": "max(kube_deployment_status_replicas_unavailable{namespace=\"terraria\",deployment=\"terraria-server\"}) or vector(0)", "legendFormat": "Unavailable" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Restarts",
+      "targets": [
+        { "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"terraria\",pod=~\"terraria-server-.*\",container=\"terraria\"}) or vector(0)", "legendFormat": "Total" },
+        { "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"terraria\",pod=~\"terraria-server-.*\",container=\"terraria\"}[5m])) or vector(0)", "legendFormat": "Increase 5m" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["terraria", "kubernetes", "local"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Terraria K8s Overview",
+  "version": 1
+}

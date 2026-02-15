@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terraria-exporter
+  namespace: terraria
+  labels:
+    app: terraria-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terraria-exporter
+  template:
+    metadata:
+      labels:
+        app: terraria-exporter
+    spec:
+      serviceAccountName: terraria-exporter
+      containers:
+        - name: terraria-exporter
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - pip install --no-cache-dir prometheus-client requests lihzahrd==3.1.0 >/tmp/pip.log 2>&1 && python /app/exporter.py
+          env:
+            - name: TERRARIA_API_URL
+              value: http://terraria-service.terraria.svc.cluster.local:7878
+            - name: TERRARIA_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: terraria-api-credentials
+                  key: api-token
+            - name: WORLD_FILE_PATH
+              value: /config/test.wld
+            - name: SERVER_CONFIG_PATH
+              value: /config/serverconfig.txt
+            - name: WORLD_PARSE_INTERVAL
+              value: "30"
+            - name: CHEST_ITEM_SERIES_LIMIT
+              value: "500"
+            - name: SCRAPE_INTERVAL
+              value: "15"
+            - name: K8S_NAMESPACE
+              value: terraria
+            - name: K8S_TERRARIA_LABEL_SELECTOR
+              value: app=terraria-server
+            - name: K8S_TERRARIA_CONTAINER
+              value: terraria
+            - name: ENABLE_LOG_PLAYER_TRACKER
+              value: "true"
+            - name: EXPORTER_PORT
+              value: "9150"
+          ports:
+            - containerPort: 9150
+              name: metrics
+              protocol: TCP
+          volumeMounts:
+            - name: exporter-code
+              mountPath: /app/exporter.py
+              subPath: exporter.py
+            - name: terraria-config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: exporter-code
+          configMap:
+            name: terraria-exporter-code
+        - name: terraria-config
+          persistentVolumeClaim:
+            claimName: terraria-config
+            readOnly: true

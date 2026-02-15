@@ -3,3 +3,31 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - configmap.yaml
+  - repo-settings.yaml
+  - app-kube-prom-stack.yaml
+  - app-loki-stack.yaml
+  - app-terraria-core.yaml
+  - app-monitoring-addons.yaml
+  - app-world-ui.yaml
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: terrariadosbobo-repo-settings
+      fieldPath: data.repoURL
+    targets:
+      - select:
+          kind: Application
+          name: terrariadosbobo-terraria-core
+        fieldPaths:
+          - spec.source.repoURL
+      - select:
+          kind: Application
+          name: terrariadosbobo-monitoring-addons
+        fieldPaths:
+          - spec.source.repoURL
+      - select:
+          kind: Application
+          name: terrariadosbobo-world-ui
+        fieldPaths:
+          - spec.source.repoURL

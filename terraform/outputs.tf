@@ -1,6 +1,6 @@
 output "terraria_connect_hint" {
   description = "Endereco para os jogadores conectarem"
-  value       = "Use o IP LAN da sua maquina + porta ${var.terraria_node_port}"
+  value       = var.terraria_connect_host != "" ? "Conecte em ${var.terraria_connect_host}:${var.terraria_node_port}" : "Use o IP LAN da sua maquina + porta ${var.terraria_node_port}"
 }
 
 output "grafana_url" {
@@ -20,7 +20,7 @@ output "terraria_api_hint" {
 }
 
 output "grafana_dashboard_hint" {
-  value = "Abra os dashboards 'Terraria K8s Overview' e 'Terraria Gameplay Overview'"
+  value = "Abra os dashboards 'Terraria K8s Overview', 'Terraria Gameplay Overview' e 'Terraria Runtime Health'"
 }
 
 output "backup_hint" {
@@ -29,4 +29,8 @@ output "backup_hint" {
 
 output "world_upload_hint" {
   value = "Rode scripts/upload-world.ps1 (Windows) ou scripts/upload-world.sh (Linux/WSL)"
+}
+
+output "world_ui_url" {
+  value = "http://localhost:30878"
 }

@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: terraria-world-backup
+  namespace: terraria
+spec:
+  schedule: "0 */6 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: alpine:3.20
+              command: ["sh", "-c"]
+              args:
+                - set -eu; ts=$(date +%Y%m%d-%H%M%S); tar -czf /backups/world-${ts}.tar.gz -C /config .; ls -1t /backups/world-*.tar.gz | tail -n +$(( ${RETENTION_COUNT} + 1 )) | xargs -r rm -f
+              env:
+                - name: RETENTION_COUNT
+                  value: "20"
+              volumeMounts:
+                - name: world-config
+                  mountPath: /config
+                  readOnly: true
+                - name: world-backups
+                  mountPath: /backups
+          volumes:
+            - name: world-config
+              persistentVolumeClaim:
+                claimName: terraria-config
+            - name: world-backups
+              persistentVolumeClaim:
+                claimName: terraria-backups

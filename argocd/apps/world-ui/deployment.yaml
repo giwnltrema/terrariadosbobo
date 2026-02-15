@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: world-creator-ui
+  namespace: terraria
+  labels:
+    app: world-creator-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: world-creator-ui
+  template:
+    metadata:
+      labels:
+        app: world-creator-ui
+    spec:
+      serviceAccountName: world-creator-ui
+      containers:
+        - name: world-creator-ui
+          image: alpine:3.20
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8787
+              name: http
+          command: ["sh", "-lc"]
+          args:
+            - |
+              set -eu
+              apk add --no-cache bash python3 py3-pip kubectl >/dev/null
+              mkdir -p /workspace/world-ui/static /workspace/scripts
+              cp /config/server.py /workspace/world-ui/server.py
+              cp /config/index.html /workspace/world-ui/static/index.html
+              cp /config/styles.css /workspace/world-ui/static/styles.css
+              cp /config/app.js /workspace/world-ui/static/app.js
+              cp /config/upload-world.sh /workspace/scripts/upload-world.sh
+              chmod +x /workspace/scripts/upload-world.sh
+              cd /workspace
+              exec env PYTHONUNBUFFERED=1 python3 /workspace/world-ui/server.py --host 0.0.0.0 --port 8787
+          volumeMounts:
+            - name: ui-code
+              mountPath: /config
+      volumes:
+        - name: ui-code
+          configMap:
+            name: world-creator-ui-code

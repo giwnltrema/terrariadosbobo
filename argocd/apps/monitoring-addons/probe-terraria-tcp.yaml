@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: terraria-tcp-probe
+  namespace: monitoring
+  labels:
+    release: kube-prom-stack
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  jobName: terraria-tcp-probe
+  interval: 30s
+  module: tcp_connect
+  prober:
+    url: terraria-blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        - terraria-service.terraria.svc.cluster.local:7777

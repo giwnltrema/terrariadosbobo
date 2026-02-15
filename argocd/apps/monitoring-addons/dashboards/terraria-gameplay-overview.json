@@ -1,0 +1,81 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Players Online",
+      "targets": [{ "expr": "max(terraria_players_online) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Players Max",
+      "targets": [{ "expr": "max(terraria_players_max) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Hardmode",
+      "targets": [{ "expr": "max(terraria_world_hardmode) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Daytime",
+      "targets": [{ "expr": "max(terraria_world_daytime) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Players Online Over Time",
+      "targets": [{ "expr": "max(terraria_players_online) or vector(0)", "legendFormat": "Players" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "World Time",
+      "targets": [{ "expr": "max(terraria_world_time_runtime) or vector(0)", "legendFormat": "World Time" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "World Structures",
+      "targets": [
+        { "expr": "max(terraria_world_chests_total) or vector(0)", "legendFormat": "Chests" },
+        { "expr": "max(terraria_world_houses_total) or vector(0)", "legendFormat": "Houses" },
+        { "expr": "max(terraria_world_housed_npcs_total) or vector(0)", "legendFormat": "Housed NPCs" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Housed NPCs",
+      "targets": [{ "expr": "sum by (npc) (terraria_world_housed_npc)" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 }
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["terraria", "gameplay", "tshock"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Terraria Gameplay Overview",
+  "version": 1
+}

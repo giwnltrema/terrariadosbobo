@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: terraria-exporter
+  namespace: monitoring
+  labels:
+    release: kube-prom-stack
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  namespaceSelector:
+    matchNames:
+      - terraria
+  selector:
+    matchLabels:
+      app: terraria-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - configmap-grafana-prometheus-datasource.yaml
+  - configmap-grafana-loki-datasource.yaml
+  - configmap-blackbox.yaml
+  - deployment-blackbox.yaml
+  - service-blackbox.yaml
+  - servicemonitor-terraria-exporter.yaml
+  - probe-terraria-tcp.yaml
+  - prometheusrule-terraria-alerts.yaml
+
+configMapGenerator:
+  - name: terraria-dashboards
+    options:
+      labels:
+        grafana_dashboard: "1"
+    files:
+      - dashboards/terraria-k8s-overview.json
+      - dashboards/terraria-gameplay-overview.json
+      - dashboards/terraria-runtime-health.json
+  - name: terraria-logs-dashboards
+    options:
+      labels:
+        grafana_dashboard: "1"
+    files:
+      - dashboards/terraria-logs-overview.json
+
+generatorOptions:
+  disableNameSuffixHash: true

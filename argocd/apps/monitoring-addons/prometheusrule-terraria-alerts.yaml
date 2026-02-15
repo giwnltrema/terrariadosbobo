@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: terraria-alert-rules
+  namespace: monitoring
+  labels:
+    release: kube-prom-stack
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  groups:
+    - name: terraria.rules
+      rules:
+        - alert: TerrariaServerDown
+          expr: probe_success{job="terraria-tcp-probe"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: Servidor Terraria indisponivel
+            description: A sonda TCP do Terraria falhou por mais de 2 minutos.
+        - alert: TerrariaGameplayMetricsDown
+          expr: terraria_exporter_source_up == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Exporter de gameplay sem dados
+            description: A API de gameplay do Terraria nao respondeu por mais de 10 minutos.

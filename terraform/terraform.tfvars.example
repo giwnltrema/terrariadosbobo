@@ -47,3 +47,4 @@ argocd_app_enabled                        = true
 argocd_app_name                           = "terrariadosbobo-bootstrap"
 argocd_app_target_revision                = "main"
 argocd_app_path                           = "argocd/apps/bootstrap"
+argocd_world_ui_app_enabled               = false

@@ -1,0 +1,94 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "API Source Up",
+      "targets": [{ "expr": "max(terraria_exporter_source_up) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Runtime Source Up",
+      "targets": [{ "expr": "max(terraria_world_runtime_up) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "World Parser Up",
+      "targets": [{ "expr": "max(terraria_world_parser_up) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Log Tracker Up",
+      "targets": [{ "expr": "max(terraria_log_tracker_up) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Players Online by Source",
+      "targets": [
+        { "expr": "max(terraria_players_online) or vector(0)", "legendFormat": "Effective" },
+        { "expr": "max(terraria_players_online_api) or vector(0)", "legendFormat": "API" },
+        { "expr": "max(terraria_players_online_log) or vector(0)", "legendFormat": "Log fallback" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "World Runtime Flags",
+      "targets": [
+        { "expr": "max(terraria_world_daytime) or vector(0)", "legendFormat": "Daytime" },
+        { "expr": "max(terraria_world_blood_moon) or vector(0)", "legendFormat": "Blood Moon" },
+        { "expr": "max(terraria_world_eclipse) or vector(0)", "legendFormat": "Eclipse" },
+        { "expr": "max(terraria_world_hardmode) or vector(0)", "legendFormat": "Hardmode" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "World Snapshot Age (seconds)",
+      "targets": [{ "expr": "max(terraria_world_snapshot_age_seconds) or vector(0)" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Probe TCP Reachability",
+      "targets": [{ "expr": "max(probe_success{job=\"terraria-tcp-probe\"}) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 12 }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "Fallback In Use",
+      "targets": [{ "expr": "((max(terraria_players_online_log) > 0) * 1) or vector(0)" }],
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 16 }
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["terraria", "runtime", "health", "debug"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Terraria Runtime Health",
+  "version": 1
+}

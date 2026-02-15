@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terraria-server
+  namespace: terraria
+  labels:
+    app: terraria-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: terraria-server
+  template:
+    metadata:
+      labels:
+        app: terraria-server
+    spec:
+      containers:
+        - name: terraria
+          image: ghcr.io/beardedio/terraria:tshock-latest
+          imagePullPolicy: IfNotPresent
+          stdin: true
+          tty: true
+          env:
+            - name: world
+              value: test.wld
+            - name: worldpath
+              value: /config
+          ports:
+            - containerPort: 7777
+              name: terraria
+              protocol: TCP
+            - containerPort: 7878
+              name: terraria-api
+              protocol: TCP
+          volumeMounts:
+            - name: terraria-config
+              mountPath: /config
+      volumes:
+        - name: terraria-config
+          persistentVolumeClaim:
+            claimName: terraria-config
