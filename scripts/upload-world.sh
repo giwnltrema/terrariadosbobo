@@ -156,7 +156,7 @@ if [[ -n "$WORLD_FILE" ]]; then
 elif [[ "$world_exists" != "true" && "$AUTO_CREATE_IF_MISSING" == "true" ]]; then
   echo "Mundo '$WORLD_NAME' nao existe. Criando automaticamente (size=$WORLD_SIZE, difficulty=$DIFFICULTY, maxplayers=$MAX_PLAYERS)..."
 
-  cat <<'EOS' | kubectl exec -i -n "$NAMESPACE" "$MANAGER_POD_NAME" -- sh -s -- "/config/$WORLD_NAME" "$WORLD_BASE_NAME" "$WORLD_SIZE_NUMBER" "$DIFFICULTY_NUMBER" "$MAX_PLAYERS" "$SERVER_PORT" "$SEED" "$EXTRA_CREATE_ARGS" >/dev/null
+  cat <<'EOS' | kubectl exec -i -n "$NAMESPACE" "$MANAGER_POD_NAME" -- sh -s -- "/config/$WORLD_NAME" "$WORLD_BASE_NAME" "$WORLD_SIZE_NUMBER" "$DIFFICULTY_NUMBER" "$MAX_PLAYERS" "$SERVER_PORT" "$SEED" "$EXTRA_CREATE_ARGS"
 set -eu
 
 WORLD_PATH="$1"
@@ -168,7 +168,24 @@ SERVER_PORT="$6"
 WORLD_SEED="$7"
 EXTRA_CREATE_ARGS="$8"
 
-CMD="./TerrariaServer -x64 -autocreate \"$WORLD_SIZE\" -world \"$WORLD_PATH\" -worldname \"$WORLD_NAME\" -difficulty \"$WORLD_DIFFICULTY\" -maxplayers \"$MAX_PLAYERS\" -port \"$SERVER_PORT\""
+TERRARIA_BIN=""
+for candidate in ./TerrariaServer /vanilla/TerrariaServer /tshock/TerrariaServer /TerrariaServer; do
+  if [ -x "$candidate" ]; then
+    TERRARIA_BIN="$candidate"
+    break
+  fi
+done
+
+if [ -z "$TERRARIA_BIN" ]; then
+  TERRARIA_BIN="$(command -v TerrariaServer || true)"
+fi
+
+if [ -z "$TERRARIA_BIN" ]; then
+  echo "TerrariaServer binary not found inside manager pod" >&2
+  exit 1
+fi
+
+CMD="\"$TERRARIA_BIN\" -x64 -autocreate \"$WORLD_SIZE\" -world \"$WORLD_PATH\" -worldname \"$WORLD_NAME\" -difficulty \"$WORLD_DIFFICULTY\" -maxplayers \"$MAX_PLAYERS\" -port \"$SERVER_PORT\""
 
 if [ -n "$WORLD_SEED" ]; then
   CMD="$CMD -seed \"$WORLD_SEED\""
@@ -225,5 +242,3 @@ if ! kubectl rollout status "deployment/$DEPLOYMENT" -n "$NAMESPACE" --timeout=3
 fi
 
 echo "Mundo pronto: $WORLD_NAME"
-
-

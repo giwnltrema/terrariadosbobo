@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -10,94 +10,119 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="sky"></div>
-  <div class="mountains"></div>
-  <main class="app-shell">
-    <header class="hero">
-      <h1>TERRARIA WORLD CREATOR</h1>
-      <p>Local map generation wizard for your Kubernetes server</p>
+  <div class="sky-layer"></div>
+  <div class="cloud-layer"></div>
+  <div class="mountain-layer"></div>
+
+  <main class="screen">
+    <header class="logo-wrap">
+      <h1 class="logo-text">Terraria</h1>
+      <p class="logo-subtitle">World Creation Console</p>
     </header>
 
-    <section class="panel">
-      <div class="row">
-        <label>
-          <span>World Name (.wld)</span>
-          <input id="worldName" type="text" value="test.wld" placeholder="my_world.wld">
+    <section class="game-window">
+      <div class="window-top-row">
+        <label class="field compact">
+          <span>Namespace</span>
+          <input id="namespace" type="text" value="terraria">
         </label>
-        <label>
-          <span>Manual Seed (optional)</span>
-          <input id="manualSeed" type="text" placeholder="leave empty for random">
+        <label class="field compact">
+          <span>Deployment</span>
+          <input id="deployment" type="text" value="terraria-server">
         </label>
+        <label class="field compact">
+          <span>PVC</span>
+          <input id="pvcName" type="text" value="terraria-config">
+        </label>
+        <button id="refreshWorlds" class="btn secondary">Refresh worlds</button>
       </div>
 
-      <div class="row">
-        <div>
-          <span class="group-title">World Size</span>
+      <section class="world-library">
+        <div class="mode-switch">
+          <button id="modeCreate" class="btn mode active">Criar novo mundo</button>
+          <button id="modeExisting" class="btn mode">Usar mundo existente</button>
+        </div>
+        <div id="worldList" class="world-list">
+          <div class="world-item empty">Carregando mundos...</div>
+        </div>
+        <p id="selectedWorldHint" class="hint">Modo atual: criar um novo mundo</p>
+      </section>
+
+      <div class="form-grid">
+        <label class="field span-2">
+          <span>Nome do mundo (.wld)</span>
+          <input id="worldName" type="text" value="test.wld" placeholder="test.wld">
+        </label>
+
+        <label class="field span-2">
+          <span>Seed manual (opcional)</span>
+          <input id="manualSeed" type="text" placeholder="deixe vazio para aleatorio">
+        </label>
+
+        <div class="option-group">
+          <span class="group-title">Tamanho</span>
           <div class="choice-grid" id="sizeChoices">
-            <button data-value="small">Small</button>
-            <button data-value="medium" class="active">Medium</button>
-            <button data-value="large">Large</button>
+            <button data-value="small" class="btn option">Pequeno</button>
+            <button data-value="medium" class="btn option active">Medio</button>
+            <button data-value="large" class="btn option">Grande</button>
           </div>
         </div>
-        <div>
-          <span class="group-title">Difficulty</span>
+
+        <div class="option-group">
+          <span class="group-title">Dificuldade</span>
           <div class="choice-grid" id="difficultyChoices">
-            <button data-value="journey">Journey</button>
-            <button data-value="classic" class="active">Classic</button>
-            <button data-value="expert">Expert</button>
-            <button data-value="master">Master</button>
+            <button data-value="journey" class="btn option">Jornada</button>
+            <button data-value="classic" class="btn option active">Classico</button>
+            <button data-value="expert" class="btn option">Perito</button>
+            <button data-value="master" class="btn option">Mestre</button>
           </div>
         </div>
-      </div>
 
-      <div class="row">
-        <div>
-          <span class="group-title">World Evil</span>
+        <div class="option-group">
+          <span class="group-title">Evil</span>
           <div class="choice-grid" id="evilChoices">
-            <button data-value="random" class="active">Random</button>
-            <button data-value="corruption">Corruption</button>
-            <button data-value="crimson">Crimson</button>
+            <button data-value="random" class="btn option active">Aleatorio</button>
+            <button data-value="corruption" class="btn option">Corrupcao</button>
+            <button data-value="crimson" class="btn option">Crimson</button>
           </div>
         </div>
-        <div>
-          <span class="group-title">Special Seeds</span>
-          <div class="seed-actions">
-            <button id="openSeedModal" class="secondary">Open seed library</button>
-            <button id="clearSeeds" class="ghost">Clear selected</button>
-          </div>
-          <p id="selectedSeedsLabel" class="seed-summary">No special seeds selected</p>
-        </div>
-      </div>
 
-      <div class="row">
-        <label>
-          <span>Max Players</span>
+        <div class="option-group">
+          <span class="group-title">Seeds especiais</span>
+          <div class="seed-actions">
+            <button id="openSeedModal" class="btn secondary">Abrir biblioteca</button>
+            <button id="clearSeeds" class="btn ghost">Limpar</button>
+          </div>
+          <p id="selectedSeedsLabel" class="hint">Nenhuma seed especial selecionada</p>
+        </div>
+
+        <label class="field">
+          <span>Max players</span>
           <input id="maxPlayers" type="number" min="1" max="255" value="8">
         </label>
-        <label>
-          <span>Server Port</span>
+
+        <label class="field">
+          <span>Porta</span>
           <input id="serverPort" type="number" min="1" max="65535" value="7777">
         </label>
-      </div>
 
-      <div class="row">
-        <label class="full-width">
-          <span>Extra create args (optional)</span>
-          <input id="extraArgs" type="text" placeholder="example: -npcstream">
+        <label class="field span-2">
+          <span>Args extras (opcional)</span>
+          <input id="extraArgs" type="text" placeholder="-npcstream ...">
         </label>
       </div>
 
-      <div class="seed-preview">
-        <strong>Resolved Seed:</strong>
-        <span id="resolvedSeed">(random)</span>
+      <div class="resolved-box">
+        <span>Resolved seed:</span>
+        <strong id="resolvedSeed">(random)</strong>
       </div>
 
       <div class="actions">
-        <button id="createWorld" class="primary">Create world on PVC</button>
+        <button id="createWorld" class="btn primary">Aplicar no servidor</button>
       </div>
     </section>
 
-    <section class="terminal panel">
+    <section class="terminal-window">
       <div class="terminal-header">
         <strong>Execution output</strong>
         <span id="runStatus" class="status idle">idle</span>
@@ -110,12 +135,12 @@
     <div class="modal-card">
       <div class="modal-header">
         <h2>Special Seed Library</h2>
-        <button id="closeSeedModal" class="ghost">Close</button>
+        <button id="closeSeedModal" class="btn ghost">Fechar</button>
       </div>
       <input id="seedSearch" type="text" placeholder="Search seed presets">
       <div id="seedList" class="seed-list"></div>
       <div class="modal-actions">
-        <button id="applySeeds" class="primary">Apply selected seeds</button>
+        <button id="applySeeds" class="btn primary">Aplicar seeds</button>
       </div>
     </div>
   </div>
@@ -123,4 +148,3 @@
   <script src="/app.js" defer></script>
 </body>
 </html>
-

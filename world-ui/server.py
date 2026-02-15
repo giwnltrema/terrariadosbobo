@@ -3,14 +3,19 @@ import argparse
 import json
 import os
 import subprocess
+import shutil
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
-from typing import Dict, List, Tuple
+from urllib.parse import urlparse, parse_qs
+from typing import Any, Dict, List, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+DEFAULT_NAMESPACE = os.environ.get("WORLD_UI_NAMESPACE", "terraria")
+DEFAULT_DEPLOYMENT = os.environ.get("WORLD_UI_DEPLOYMENT", "terraria-server")
+DEFAULT_PVC_NAME = os.environ.get("WORLD_UI_PVC_NAME", "terraria-config")
 
 SPECIAL_SEEDS = [
     {
@@ -138,6 +143,10 @@ def build_world_command(payload: Dict) -> Tuple[List[str], Dict]:
     if not world_name.endswith(".wld"):
         world_name += ".wld"
 
+    namespace = str(payload.get("namespace", DEFAULT_NAMESPACE)).strip() or DEFAULT_NAMESPACE
+    deployment = str(payload.get("deployment", DEFAULT_DEPLOYMENT)).strip() or DEFAULT_DEPLOYMENT
+    pvc_name = str(payload.get("pvc_name", DEFAULT_PVC_NAME)).strip() or DEFAULT_PVC_NAME
+
     world_size = sanitize_choice(str(payload.get("world_size", "medium")).lower(), {"small", "medium", "large"}, "medium")
     difficulty = sanitize_choice(
         str(payload.get("difficulty", "classic")).lower(),
@@ -174,6 +183,12 @@ def build_world_command(payload: Dict) -> Tuple[List[str], Dict]:
             "Bypass",
             "-File",
             str(script_path),
+            "-Namespace",
+            namespace,
+            "-Deployment",
+            deployment,
+            "-PvcName",
+            pvc_name,
             "-WorldName",
             world_name,
             "-WorldSize",
@@ -194,6 +209,12 @@ def build_world_command(payload: Dict) -> Tuple[List[str], Dict]:
         command = [
             "bash",
             str(script_path),
+            "--namespace",
+            namespace,
+            "--deployment",
+            deployment,
+            "--pvc-name",
+            pvc_name,
             "--world-name",
             world_name,
             "--world-size",
@@ -211,6 +232,9 @@ def build_world_command(payload: Dict) -> Tuple[List[str], Dict]:
             command.extend(["--extra-create-args", extra_args])
 
     meta = {
+        "namespace": namespace,
+        "deployment": deployment,
+        "pvc_name": pvc_name,
         "world_name": world_name,
         "world_size": world_size,
         "difficulty": difficulty,
@@ -225,7 +249,7 @@ def build_world_command(payload: Dict) -> Tuple[List[str], Dict]:
     return command, meta
 
 
-def run_command(command: List[str]) -> Dict:
+def run_command(command: List[str], timeout_seconds: int = 3600, stdin_text: str = "") -> Dict:
     started = time.time()
     try:
         result = subprocess.run(
@@ -233,8 +257,9 @@ def run_command(command: List[str]) -> Dict:
             cwd=REPO_ROOT,
             text=True,
             capture_output=True,
-            timeout=3600,
+            timeout=timeout_seconds,
             check=False,
+            input=stdin_text,
         )
     except FileNotFoundError as exc:
         return {
@@ -247,7 +272,7 @@ def run_command(command: List[str]) -> Dict:
         return {
             "ok": False,
             "exit_code": 124,
-            "output": "World creation command timed out after 3600s.",
+            "output": f"Command timed out after {timeout_seconds}s.",
             "duration_seconds": round(time.time() - started, 2),
         }
 
@@ -265,6 +290,140 @@ def run_command(command: List[str]) -> Dict:
     }
 
 
+def list_worlds_from_pvc(namespace: str, pvc_name: str, manager_image: str = "ghcr.io/beardedio/terraria:latest") -> Dict[str, Any]:
+    if shutil.which("kubectl") is None:
+        return {
+            "ok": False,
+            "error": "kubectl nao encontrado no ambiente do world-ui",
+            "namespace": namespace,
+            "pvc_name": pvc_name,
+            "worlds": [],
+        }
+
+    pod_name = f"world-ui-ls-{int(time.time() * 1000)}"
+    manifest = f"""
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {pod_name}
+  namespace: {namespace}
+spec:
+  restartPolicy: Never
+  containers:
+    - name: world-manager
+      image: {manager_image}
+      command: ["sh", "-c", "sleep 240"]
+      volumeMounts:
+        - name: terraria-config
+          mountPath: /config
+  volumes:
+    - name: terraria-config
+      persistentVolumeClaim:
+        claimName: {pvc_name}
+""".strip()
+
+    try:
+        apply_result = run_command(["kubectl", "apply", "-f", "-"], timeout_seconds=120, stdin_text=manifest)
+        if not apply_result["ok"]:
+            return {
+                "ok": False,
+                "error": "falha ao criar pod auxiliar para listar mundos",
+                "details": apply_result["output"],
+                "namespace": namespace,
+                "pvc_name": pvc_name,
+                "worlds": [],
+            }
+
+        wait_result = run_command(
+            [
+                "kubectl",
+                "wait",
+                "--for=condition=Ready",
+                f"pod/{pod_name}",
+                "-n",
+                namespace,
+                "--timeout=180s",
+            ],
+            timeout_seconds=210,
+        )
+        if not wait_result["ok"]:
+            return {
+                "ok": False,
+                "error": "pod auxiliar nao ficou pronto para leitura do PVC",
+                "details": wait_result["output"],
+                "namespace": namespace,
+                "pvc_name": pvc_name,
+                "worlds": [],
+            }
+
+        list_script = "for f in /config/*.wld; do [ -f \"$f\" ] || continue; b=$(basename \"$f\"); s=$(wc -c < \"$f\" 2>/dev/null || echo 0); m=$(date -r \"$f\" +%s 2>/dev/null || echo 0); printf \"%s|%s|%s\\n\" \"$b\" \"$s\" \"$m\"; done"
+        list_result = run_command(
+            ["kubectl", "exec", "-n", namespace, pod_name, "--", "sh", "-lc", list_script],
+            timeout_seconds=90,
+        )
+        if not list_result["ok"]:
+            return {
+                "ok": False,
+                "error": "falha ao listar arquivos .wld no PVC",
+                "details": list_result["output"],
+                "namespace": namespace,
+                "pvc_name": pvc_name,
+                "worlds": [],
+            }
+
+        worlds: List[Dict[str, Any]] = []
+        for line in (list_result["output"] or "").splitlines():
+            parts = line.strip().split("|")
+            if len(parts) != 3:
+                continue
+
+            name = parts[0].strip()
+            try:
+                size_bytes = int(parts[1])
+            except ValueError:
+                size_bytes = 0
+
+            try:
+                modified_epoch = int(parts[2])
+            except ValueError:
+                modified_epoch = 0
+
+            if not name:
+                continue
+
+            worlds.append(
+                {
+                    "name": name,
+                    "size_bytes": size_bytes,
+                    "modified_epoch": modified_epoch,
+                }
+            )
+
+        worlds.sort(key=lambda item: item["name"].lower())
+
+        return {
+            "ok": True,
+            "namespace": namespace,
+            "pvc_name": pvc_name,
+            "pod_name": pod_name,
+            "worlds": worlds,
+        }
+    finally:
+        cleanup_result = run_command(
+            [
+                "kubectl",
+                "delete",
+                "pod",
+                pod_name,
+                "-n",
+                namespace,
+                "--ignore-not-found",
+                "--wait=false",
+            ],
+            timeout_seconds=30,
+        )
+        if not cleanup_result["ok"]:
+            print(f"[world-ui] warning: failed to cleanup helper pod {pod_name}: {cleanup_result['output']}")
 class WorldCreatorHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_DIR), **kwargs)
@@ -296,11 +455,20 @@ class WorldCreatorHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/special-seeds":
             return self.send_json(200, {"seeds": SPECIAL_SEEDS})
 
+        if parsed.path == "/api/worlds":
+            query = parse_qs(parsed.query)
+            namespace = (query.get("namespace", [DEFAULT_NAMESPACE])[0] or DEFAULT_NAMESPACE).strip()
+            pvc_name = (query.get("pvc_name", [DEFAULT_PVC_NAME])[0] or DEFAULT_PVC_NAME).strip()
+            manager_image = (query.get("manager_image", ["ghcr.io/beardedio/terraria:latest"])[0] or "ghcr.io/beardedio/terraria:latest").strip()
+
+            worlds_result = list_worlds_from_pvc(namespace=namespace, pvc_name=pvc_name, manager_image=manager_image)
+            status = 200 if worlds_result.get("ok") else 500
+            return self.send_json(status, worlds_result)
+
         if parsed.path.startswith("/api/"):
             return self.send_json(404, {"ok": False, "error": "Endpoint not found"})
 
         return super().do_GET()
-
     def do_POST(self):
         parsed = urlparse(self.path)
         if parsed.path != "/api/create-world":
@@ -351,7 +519,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 
 
 

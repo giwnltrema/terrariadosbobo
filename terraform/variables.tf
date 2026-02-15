@@ -31,7 +31,7 @@ variable "argocd_namespace" {
 variable "terraria_image" {
   description = "Imagem do servidor Terraria"
   type        = string
-  default     = "ghcr.io/beardedio/terraria:tshock-latest"
+  default     = "ghcr.io/beardedio/terraria:latest"
 }
 
 variable "world_file" {
@@ -269,4 +269,3 @@ variable "argocd_app_path" {
   type        = string
   default     = "argocd/apps/bootstrap"
 }
-

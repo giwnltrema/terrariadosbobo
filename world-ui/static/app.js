@@ -4,6 +4,9 @@ const state = {
   worldEvil: "random",
   selectedSeedIds: new Set(),
   specialSeeds: [],
+  worldMode: "create",
+  existingWorlds: [],
+  selectedExistingWorld: null,
 };
 
 const worldNameEl = document.getElementById("worldName");
@@ -11,10 +14,20 @@ const manualSeedEl = document.getElementById("manualSeed");
 const maxPlayersEl = document.getElementById("maxPlayers");
 const serverPortEl = document.getElementById("serverPort");
 const extraArgsEl = document.getElementById("extraArgs");
+const namespaceEl = document.getElementById("namespace");
+const deploymentEl = document.getElementById("deployment");
+const pvcNameEl = document.getElementById("pvcName");
+
 const outputEl = document.getElementById("output");
 const runStatusEl = document.getElementById("runStatus");
 const resolvedSeedEl = document.getElementById("resolvedSeed");
 const selectedSeedsLabelEl = document.getElementById("selectedSeedsLabel");
+const selectedWorldHintEl = document.getElementById("selectedWorldHint");
+const worldListEl = document.getElementById("worldList");
+
+const modeCreateEl = document.getElementById("modeCreate");
+const modeExistingEl = document.getElementById("modeExisting");
+const refreshWorldsEl = document.getElementById("refreshWorlds");
 
 const seedModalEl = document.getElementById("seedModal");
 const seedListEl = document.getElementById("seedList");
@@ -25,10 +38,33 @@ function setStatus(mode, text) {
   runStatusEl.textContent = text;
 }
 
+function fmtBytes(bytes) {
+  const n = Number(bytes || 0);
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function fmtTimestamp(epoch) {
+  const n = Number(epoch || 0);
+  if (!n) return "unknown";
+  const d = new Date(n * 1000);
+  return d.toLocaleString();
+}
+
+function getClusterScope() {
+  return {
+    namespace: namespaceEl.value.trim() || "terraria",
+    deployment: deploymentEl.value.trim() || "terraria-server",
+    pvc_name: pvcNameEl.value.trim() || "terraria-config",
+  };
+}
+
 function bindChoiceGroup(rootId, key) {
   const root = document.getElementById(rootId);
   for (const button of root.querySelectorAll("button")) {
     button.addEventListener("click", () => {
+      if (button.disabled) return;
       for (const b of root.querySelectorAll("button")) {
         b.classList.remove("active");
       }
@@ -60,7 +96,7 @@ function resolveSeedPreview() {
 function refreshSeedSummary() {
   const selected = state.specialSeeds.filter((seed) => state.selectedSeedIds.has(seed.id));
   if (selected.length === 0) {
-    selectedSeedsLabelEl.textContent = "No special seeds selected";
+    selectedSeedsLabelEl.textContent = "Nenhuma seed especial selecionada";
   } else {
     selectedSeedsLabelEl.textContent = selected.map((seed) => seed.label).join(", ");
   }
@@ -107,12 +143,123 @@ function renderSeedCards(filterText = "") {
   }
 }
 
+function renderWorldList() {
+  worldListEl.innerHTML = "";
+
+  if (!state.existingWorlds.length) {
+    const empty = document.createElement("div");
+    empty.className = "world-item empty";
+    empty.textContent = "Nenhum .wld encontrado no PVC.";
+    worldListEl.appendChild(empty);
+    return;
+  }
+
+  for (const world of state.existingWorlds) {
+    const row = document.createElement("label");
+    row.className = `world-item ${state.selectedExistingWorld === world.name ? "active" : ""}`;
+    row.innerHTML = `
+      <input type="radio" name="existingWorld" data-name="${world.name}" ${state.selectedExistingWorld === world.name ? "checked" : ""}>
+      <div>
+        <strong>${world.name}</strong>
+        <div class="meta">${fmtBytes(world.size_bytes)} • ${fmtTimestamp(world.modified_epoch)}</div>
+      </div>
+      <span class="meta">.wld</span>
+    `;
+    worldListEl.appendChild(row);
+  }
+
+  for (const radio of worldListEl.querySelectorAll("input[type='radio']")) {
+    radio.addEventListener("change", () => {
+      state.selectedExistingWorld = radio.dataset.name;
+      worldNameEl.value = state.selectedExistingWorld;
+      renderWorldList();
+      refreshWorldModeUI();
+    });
+  }
+}
+
+function refreshWorldModeUI() {
+  const usingExisting = state.worldMode === "existing";
+  modeCreateEl.classList.toggle("active", !usingExisting);
+  modeExistingEl.classList.toggle("active", usingExisting);
+
+  const creationControls = [
+    manualSeedEl,
+    maxPlayersEl,
+    serverPortEl,
+    extraArgsEl,
+    document.getElementById("openSeedModal"),
+    document.getElementById("clearSeeds"),
+    ...document.querySelectorAll("#sizeChoices button"),
+    ...document.querySelectorAll("#difficultyChoices button"),
+    ...document.querySelectorAll("#evilChoices button"),
+  ];
+
+  for (const control of creationControls) {
+    control.disabled = usingExisting;
+  }
+
+  if (usingExisting) {
+    if (state.selectedExistingWorld) {
+      worldNameEl.value = state.selectedExistingWorld;
+      selectedWorldHintEl.textContent = `Modo atual: usar mundo existente '${state.selectedExistingWorld}'`;
+    } else {
+      selectedWorldHintEl.textContent = "Modo atual: usar mundo existente (selecione um da lista)";
+    }
+  } else {
+    selectedWorldHintEl.textContent = "Modo atual: criar um novo mundo";
+  }
+}
+
+function setWorldMode(mode) {
+  state.worldMode = mode;
+  if (mode === "existing" && !state.selectedExistingWorld && state.existingWorlds.length > 0) {
+    state.selectedExistingWorld = state.existingWorlds[0].name;
+    worldNameEl.value = state.selectedExistingWorld;
+  }
+  refreshWorldModeUI();
+  renderWorldList();
+}
+
 async function loadSeeds() {
   const response = await fetch("/api/special-seeds");
   const data = await response.json();
   state.specialSeeds = data.seeds || [];
   renderSeedCards();
   refreshSeedSummary();
+}
+
+async function loadWorlds() {
+  worldListEl.innerHTML = '<div class="world-item empty">Buscando mundos no PVC...</div>';
+  const scope = getClusterScope();
+  const params = new URLSearchParams({
+    namespace: scope.namespace,
+    pvc_name: scope.pvc_name,
+  });
+
+  try {
+    const response = await fetch(`/api/worlds?${params.toString()}`);
+    const result = await response.json();
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || `HTTP ${response.status}`);
+    }
+
+    state.existingWorlds = result.worlds || [];
+
+    if (state.selectedExistingWorld && !state.existingWorlds.some((w) => w.name === state.selectedExistingWorld)) {
+      state.selectedExistingWorld = null;
+    }
+
+    if (state.worldMode === "existing" && !state.selectedExistingWorld && state.existingWorlds.length > 0) {
+      state.selectedExistingWorld = state.existingWorlds[0].name;
+      worldNameEl.value = state.selectedExistingWorld;
+    }
+
+    renderWorldList();
+    refreshWorldModeUI();
+  } catch (error) {
+    worldListEl.innerHTML = `<div class="world-item empty">Erro ao listar mundos: ${error}</div>`;
+  }
 }
 
 function openModal() {
@@ -124,8 +271,21 @@ function closeModal() {
 }
 
 async function createWorld() {
+  const scope = getClusterScope();
+
+  let worldName = worldNameEl.value.trim() || "test.wld";
+  if (state.worldMode === "existing") {
+    if (!state.selectedExistingWorld) {
+      outputEl.textContent = "Selecione um mundo existente para aplicar.";
+      setStatus("error", "error");
+      return;
+    }
+    worldName = state.selectedExistingWorld;
+  }
+
   const payload = {
-    world_name: worldNameEl.value.trim() || "test.wld",
+    ...scope,
+    world_name: worldName,
     seed: manualSeedEl.value.trim(),
     special_seed_ids: Array.from(state.selectedSeedIds),
     world_size: state.size,
@@ -152,6 +312,9 @@ async function createWorld() {
 
     const header = [
       `ok: ${result.ok}`,
+      `namespace: ${result.namespace}`,
+      `deployment: ${result.deployment}`,
+      `pvc: ${result.pvc_name}`,
       `exit_code: ${result.exit_code}`,
       `seed_mode: ${result.seed_mode}`,
       `resolved_seed: ${result.resolved_seed || "(random)"}`,
@@ -165,6 +328,8 @@ async function createWorld() {
 
     outputEl.textContent = `${header}\n${result.output || "(no output)"}`;
     setStatus(result.ok ? "success" : "error", result.ok ? "success" : "error");
+
+    await loadWorlds();
   } catch (error) {
     outputEl.textContent = `Request failed: ${error}`;
     setStatus("error", "error");
@@ -201,14 +366,22 @@ function boot() {
     }
   });
 
+  modeCreateEl.addEventListener("click", () => setWorldMode("create"));
+  modeExistingEl.addEventListener("click", () => setWorldMode("existing"));
+  refreshWorldsEl.addEventListener("click", loadWorlds);
+
   document.getElementById("createWorld").addEventListener("click", createWorld);
 
   setStatus("idle", "idle");
+  refreshSeedSummary();
+  refreshWorldModeUI();
+
   loadSeeds().catch((error) => {
     outputEl.textContent = `Failed to load seed library: ${error}`;
     setStatus("error", "error");
   });
+
+  loadWorlds();
 }
 
 boot();
-

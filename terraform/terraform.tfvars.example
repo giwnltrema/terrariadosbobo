@@ -1,7 +1,8 @@
 # Ajuste os valores antes do terraform apply
 kubeconfig_path                           = "~/.kube/config"
 kube_context                              = "docker-desktop"
-terraria_image                            = "ghcr.io/beardedio/terraria:tshock-latest"
+terraria_image                            = "ghcr.io/beardedio/terraria:latest"
+# Use ghcr.io/beardedio/terraria:tshock-latest somente se o cliente de jogo for compativel com Terraria v1.4.4.9.
 world_file                                = "test.wld"
 terraria_api_url                          = "http://terraria-service.terraria.svc.cluster.local:7878"
 terraria_api_token                        = ""

@@ -63,6 +63,45 @@ resource "helm_release" "loki_stack" {
   ]
 }
 
+
+# The loki-stack chart creates a ConfigMap named "loki-stack" with a Loki
+# datasource marked as default. We keep Prometheus as the single default
+# datasource and force this generated datasource to non-default.
+resource "kubernetes_manifest" "loki_stack_datasource_override" {
+  count = var.loki_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "v1"
+    kind       = "ConfigMap"
+    metadata = {
+      name      = "loki-stack"
+      namespace = kubernetes_namespace.monitoring.metadata[0].name
+    }
+    data = {
+      "loki-stack-datasource.yaml" = <<-EOT
+        apiVersion: 1
+        datasources:
+        - name: Loki
+          type: loki
+          access: proxy
+          url: "http://loki-stack:3100"
+          version: 1
+          isDefault: false
+          jsonData:
+            {}
+      EOT
+    }
+  }
+
+  field_manager {
+    name            = "terraform-loki-ds-override"
+    force_conflicts = true
+  }
+
+  depends_on = [
+    helm_release.loki_stack
+  ]
+}
 resource "kubernetes_config_map" "grafana_loki_datasource" {
   count = var.loki_enabled ? 1 : 0
 
@@ -92,7 +131,8 @@ resource "kubernetes_config_map" "grafana_loki_datasource" {
 
   depends_on = [
     helm_release.kube_prometheus_stack,
-    helm_release.loki_stack
+    helm_release.loki_stack,
+    kubernetes_manifest.loki_stack_datasource_override
   ]
 }
 resource "kubernetes_config_map" "grafana_prometheus_datasource" {
@@ -538,4 +578,6 @@ resource "kubernetes_manifest" "argocd_bootstrap_application" {
     kubernetes_secret.argocd_repository
   ]
 }
+
+
 

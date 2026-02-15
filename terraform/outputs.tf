@@ -16,7 +16,7 @@ output "argocd_url" {
 }
 
 output "terraria_api_hint" {
-  value = "API de gameplay: ${var.terraria_api_url} (fallback parser .wld em /config/${var.world_file})"
+  value = strcontains(lower(var.terraria_image), "tshock") ? "API de gameplay: ${var.terraria_api_url} (fallback parser .wld em /config/${var.world_file})" : "Imagem atual sem API TShock; exporter usa parser .wld em /config/${var.world_file}."
 }
 
 output "grafana_dashboard_hint" {
