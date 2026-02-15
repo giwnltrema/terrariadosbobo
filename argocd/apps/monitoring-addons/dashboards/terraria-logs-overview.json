@@ -42,7 +42,7 @@
       "title": "Filtered Logs",
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
-        { "refId": "A", "expr": "{namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\"}", "queryType": "range" }
+        { "refId": "A", "expr": "{namespace=~\"$namespace\", pod=~\"$pod\"}", "queryType": "range" }
       ],
       "gridPos": { "h": 16, "w": 24, "x": 0, "y": 0 }
     }
